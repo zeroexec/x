@@ -3,10 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Private Cloud Console</title>
+    <title>Welcome!</title>
     <link id="favicon" rel="icon" href="">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
     <style>
         :root { --bg: #000; --nav-bg: #121212; --accent: #00e5ff; --text: #fff; --text-dim: #888; --border: #222; --danger: #ff4d4d; --success: #00ff88; }
         * { scrollbar-width: thin; scrollbar-color: #333 var(--bg); }
@@ -14,115 +15,161 @@
         ::-webkit-scrollbar-track { background: var(--bg); }
         ::-webkit-scrollbar-thumb { background: #333; border-radius: 10px; }
         ::-webkit-scrollbar-thumb:hover { background: var(--accent); }
-        body, html { margin: 0; height: 100%; background: var(--bg); font-family: sans-serif; overflow: hidden; color: white; display: none; }
+        body, html { margin: 0; height: 100%; background: var(--bg); font-family: sans-serif; overflow: hidden; color: white; }
+        #lockOverlay { position: fixed; inset: 0; background: #000; display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 9999; transition: opacity 0.5s ease; }
+        #lockOverlay i { font-size: 80px; color: var(--accent); margin-bottom: 20px; }
+        #mainApp { display: none; height: 100%; width: 100%; }
         .main-container { position: absolute; top: 0; width: 100%; height: 100%; z-index: 1; }
         .page-frame { width: 100%; height: 100%; border: none; background: #fff; display: none; }
         .page-frame.active { display: block; }
-        .bottom-nav { position: fixed; bottom: 0; width: 100%; height: 70px; background: var(--nav-bg); border-top: 1px solid var(--border); display: flex; justify-content: space-around; align-items: center; z-index: 210; }
-        .dock-trigger { display: none; position: fixed; bottom: 0; left: 0; width: 100%; height: 15px; z-index: 205; background: transparent; }
+        .bottom-nav { position: fixed; bottom: 0; width: 100%; height: 70px; background: var(--nav-bg); border-top: 1px solid var(--border); display: flex; justify-content: space-around; align-items: center; z-index: 210; transition: 0.3s; }
         @media (min-width: 769px) {
-            .dock-trigger { display: block; }
-            .bottom-nav { left: 50%; bottom: 20px; width: auto; min-width: 350px; padding: 0 20px; border-radius: 20px; transform: translateX(-50%) translateY(150%); opacity: 0; pointer-events: none; border: 1px solid var(--border); transition: 0.3s; }
+            .bottom-nav { left: 50%; bottom: 20px; width: auto; min-width: 350px; padding: 0 20px; border-radius: 20px; transform: translateX(-50%) translateY(150%); opacity: 0; pointer-events: none; border: 1px solid var(--border); }
             .bottom-nav.active { transform: translateX(-50%) translateY(0); opacity: 1; pointer-events: auto; }
         }
-        .nav-item { background: none; border: none; color: var(--text-dim); font-size: 11px; cursor: pointer; display: flex; flex-direction: column; align-items: center; padding: 0 15px; transition: 0.2s; }
+        .nav-item { background: none; border: none; color: var(--text-dim); font-size: 11px; cursor: pointer; display: flex; flex-direction: column; align-items: center; padding: 0 15px; transition: 0.2s; position: relative; }
         .nav-item i { font-size: 22px; margin-bottom: 4px; color: inherit; }
-        .nav-item:hover, .nav-item.active { color: var(--accent); }
+        .nav-item.active { color: var(--accent); }
         .overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.8); display: none; z-index: 200; opacity: 0; transition: opacity 0.3s; }
         .overlay.show { opacity: 1; }
-        .bottom-sheet { position: fixed; bottom: 0; width: 100%; background: var(--nav-bg); border-radius: 20px 20px 0 0; z-index: 300; padding: 15px 0; transform: translateY(100%); transition: transform 0.3s ease; }
+        .bottom-sheet { position: fixed; bottom: 0; width: 100%; background: var(--nav-bg); border-radius: 20px 20px 0 0; z-index: 300; padding: 15px 0; transform: translateY(100%); transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
         .bottom-sheet.show { transform: translateY(0); }
         .sheet-header { display: flex; justify-content: space-between; align-items: center; padding: 0 20px 15px; border-bottom: 1px solid var(--border); }
+        .manage-item { display: flex; align-items: center; padding: 12px; background: #1a1a1a; margin-bottom: 8px; border-radius: 10px; border: 1px solid #222; }
+        .manage-item.sortable-ghost { opacity: 0.4; background: var(--accent); }
         .btn-action { width: 100%; padding: 14px; background: var(--accent); border: none; border-radius: 12px; font-weight: bold; cursor: pointer; color: #000; }
         .add-form input { width: 100%; padding: 12px; margin-bottom: 8px; background: #222; border: 1px solid #333; color: #fff; border-radius: 8px; box-sizing: border-box; }
-        #toast { position: fixed; top: -100px; left: 50%; transform: translateX(-50%); background: #222; color: #fff; padding: 12px 25px; border-radius: 50px; border: 1px solid var(--border); z-index: 10000; transition: 0.5s; display: flex; align-items: center; gap: 10px; font-size: 14px; }
+        #toast { position: fixed; top: -100px; left: 50%; transform: translateX(-50%); background: #222; color: #fff; padding: 12px 25px; border-radius: 50px; border: 1px solid var(--border); z-index: 10000; transition: 0.5s; font-size: 14px; }
         #toast.show { top: 20px; }
-        #moreNavGrid, #manageList { overflow-y: auto; scrollbar-gutter: stable; }
+        .star-btn { cursor: pointer; margin: 0 15px; transition: 0.3s; }
+        .star-btn.active { color: var(--accent); }
+        .dock-trigger { display: none; position: fixed; bottom: 0; left: 0; width: 100%; height: 15px; z-index: 205; background: transparent; }
+        @media (min-width: 769px) { .dock-trigger { display: block; } }
     </style>
 </head>
 <body>
-    <div id="toast"><i id="toastIcon"></i> <span id="toastMsg"></span></div>
-    <div class="main-container" id="frameStore"></div>
-    <div class="dock-trigger" id="dockTrigger"></div>
-    <nav class="bottom-nav" id="mainNav"></nav>
-    <div class="overlay" id="overlay" onclick="closeAllModals()"></div>
-
-    <div class="bottom-sheet" id="moreSheet">
-        <div class="sheet-header"><span>Explore</span><button class="nav-item" onclick="openManage()" style="color:var(--accent)"><i class="fa-solid fa-gear"></i></button></div>
-        <div id="moreNavGrid" style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px 10px; padding: 25px 15px; max-height: 50vh;"></div>
-    </div>
-
-    <div class="bottom-sheet" id="manageSheet">
-        <div class="sheet-header"><button onclick="backToMore()" style="background:none; border:none; color:var(--text-dim);"><i class="fa-solid fa-chevron-left"></i></button><span>Management</span><button onclick="openSettingsSheet()" style="background:none; border:none; color:var(--accent);"><i class="fa-solid fa-sliders"></i></button></div>
-        <div class="add-form" style="padding:20px;">
-            <input type="text" id="n_name" placeholder="Nama Menu">
-            <input type="text" id="n_url" placeholder="URL">
-            <input type="text" id="n_icon" placeholder="Icon Class">
-            <button class="btn-action" onclick="handleSubmit()">SIMPAN MENU</button>
+    <div id="lockOverlay"><i class="fa-solid fa-lock"></i><p>VERIFYING ACCESS...</p></div>
+    <div id="toast"><span id="toastMsg"></span></div>
+    <div id="mainApp">
+        <div class="main-container" id="frameStore"></div>
+        <div class="dock-trigger" id="dockTrigger"></div>
+        <nav class="bottom-nav" id="mainNav"></nav>
+        <div class="overlay" id="overlay"></div>
+        <div class="bottom-sheet" id="moreSheet">
+            <div class="sheet-header"><span>Explore</span><button class="nav-item" onclick="openManage()" style="color:var(--accent)"><i class="fa-solid fa-gear"></i></button></div>
+            <div id="moreNavGrid" style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px 10px; padding: 25px 15px; max-height: 50vh; overflow-y:auto;"></div>
         </div>
-        <div id="manageList" style="padding: 10px 20px; max-height: 25vh;"></div>
-        <div style="padding: 10px 20px;"><button onclick="handleLogout()" style="width:100%; background:none; border:1px solid var(--danger); color:var(--danger); padding:10px; border-radius:8px; cursor:pointer;">SIGN OUT</button></div>
-    </div>
-
-    <div class="bottom-sheet" id="settingsSheet">
-        <div class="sheet-header"><button onclick="backToManage()" style="background:none; border:none; color:var(--text-dim);"><i class="fa-solid fa-chevron-left"></i></button><span>Settings</span><div style="width:24px"></div></div>
-        <div style="padding: 20px;">
-            <input type="text" id="s_title" placeholder="Site Title" style="width:100%; padding:12px; margin-bottom:10px; background:#222; border:1px solid #333; color:#fff; border-radius:8px;">
-            <button class="btn-action" onclick="updateSettings()">SAVE CHANGES</button>
+        <div class="bottom-sheet" id="manageSheet">
+            <div class="sheet-header"><button onclick="backToMore()" style="background:none; border:none; color:var(--text-dim);"><i class="fa-solid fa-chevron-left"></i></button><span>Navigation Manager</span><button onclick="openSettingsSheet()" style="background:none; border:none; color:var(--accent);"><i class="fa-solid fa-sliders"></i></button></div>
+            <div class="add-form" style="padding:20px;">
+                <input type="text" id="n_name" placeholder="Name">
+                <input type="text" id="n_url" placeholder="URL (https://)">
+                <input type="text" id="n_icon" placeholder="Icon (e.g., fa-solid fa-house)">
+                <button class="btn-action" onclick="handleSubmit()">ADD NEW MENU</button>
+            </div>
+            <div id="manageList" style="padding: 10px 20px; max-height: 40vh; overflow-y:auto;"></div>
+            <div style="padding: 10px 20px;"><button onclick="handleLogout()" style="width:100%; background:none; border:1px solid var(--danger); color:var(--danger); padding:10px; border-radius:8px; cursor:pointer;">SIGN OUT</button></div>
+        </div>
+        <div class="bottom-sheet" id="settingsSheet">
+            <div class="sheet-header"><button onclick="backToManage()" style="background:none; border:none; color:var(--text-dim);"><i class="fa-solid fa-chevron-left"></i></button><span>Site Settings</span><div style="width:24px"></div></div>
+            <div style="padding: 20px;">
+                <input type="text" id="s_title" placeholder="Site Title" style="width:100%; padding:12px; margin-bottom:10px; background:#222; border:1px solid #333; color:#fff; border-radius:8px;">
+                <input type="file" id="s_fav_file" accept="image/*" style="display:none" onchange="updateSettings()">
+                <button class="btn-action" onclick="document.getElementById('s_fav_file').click()">CHANGE FAVICON</button>
+            </div>
         </div>
     </div>
-
     <script>
         const client = supabase.createClient('https://nynowiamkpddohtaoqvt.supabase.co', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im55bm93aWFta3BkZG9odGFvcXZ0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjY2MzQyODEsImV4cCI6MjA4MjIxMDI4MX0.vN7m2SUztxtHUROEMOqtbqMGRPehM9UJZP_VSsVMRtw');
-        
         async function checkAuth() {
             const { data } = await client.auth.getSession();
             if (!data.session) { window.location.href = 'index.html'; }
-            else { document.body.style.display = 'block'; loadSettings(); loadData(true); }
+            else {
+                document.getElementById('lockOverlay').style.opacity = '0';
+                setTimeout(() => {
+                    document.getElementById('lockOverlay').style.display = 'none';
+                    document.getElementById('mainApp').style.display = 'block';
+                    loadSettings(); loadData(true);
+                }, 500);
+            }
         }
-
-        function showNotify(msg) { const t = document.getElementById('toast'); document.getElementById('toastMsg').innerText = msg; t.classList.add('show'); setTimeout(() => t.classList.remove('show'), 3000); }
-        async function handleLogout() { await client.auth.signOut(); window.location.href = 'index.html'; }
-        async function loadSettings() { const { data } = await client.from('settings').select('*').eq('id', 1).single(); if(data) { document.title = data.site_title; document.getElementById('favicon').href = data.site_favicon; document.getElementById('s_title').value = data.site_title; } }
+        async function loadSettings() {
+            const { data } = await client.from('settings').select('*').eq('id', 1).maybeSingle();
+            if(data) { document.title = data.site_title; updateFavicon(data.site_favicon); document.getElementById('s_title').value = data.site_title; }
+        }
+        function updateFavicon(url) {
+            let link = document.querySelector("link[rel~='icon']");
+            if (!link) { link = document.createElement('link'); link.rel = 'icon'; document.head.appendChild(link); }
+            link.href = url + '?t=' + Date.now();
+        }
+        async function updateSettings() {
+            const title = document.getElementById('s_title').value;
+            const file = document.getElementById('s_fav_file').files[0];
+            let favUrl = document.querySelector("link[rel~='icon']").href.split('?')[0];
+            if (file) {
+                const path = `fav-${Date.now()}`;
+                await client.storage.from('assets').upload(path, file);
+                favUrl = client.storage.from('assets').getPublicUrl(path).data.publicUrl;
+            }
+            await client.from('settings').update({ site_title: title, site_favicon: favUrl }).eq('id', 1);
+            loadSettings(); showNotify("Settings Saved");
+        }
         async function loadData(init = false) {
             const { data } = await client.from('navigations').select('*').order('order_index');
             const main = document.getElementById('mainNav'); const more = document.getElementById('moreNavGrid'); const list = document.getElementById('manageList');
             main.innerHTML = ''; more.innerHTML = ''; list.innerHTML = '';
-            (data || []).forEach(item => {
+            data?.forEach(item => {
                 const btn = document.createElement('button'); btn.className = 'nav-item nav-trigger'; btn.dataset.url = item.url;
                 btn.onclick = () => { openPage(item.url); closeAllModals(); };
                 btn.innerHTML = `<i class="${item.icon_class}"></i><span>${item.name}</span>`;
                 if(item.is_main) main.appendChild(btn); else more.appendChild(btn);
-                const mItem = document.createElement('div'); mItem.style = "display:flex; justify-content:space-between; padding:10px 0; border-bottom:1px solid #222;";
-                mItem.innerHTML = `<span>${item.name}</span> <i class="fa-solid fa-trash" style="color:var(--danger); cursor:pointer" onclick="deleteNav('${item.id}')"></i>`;
+                const mItem = document.createElement('div'); mItem.className = 'manage-item'; mItem.dataset.id = item.id;
+                mItem.innerHTML = `<i class="fa-solid fa-grip-vertical" style="color:#444;cursor:grab"></i><span style="flex:1;margin-left:15px">${item.name}</span>
+                <i class="fa-solid fa-star star-btn ${item.is_main ? 'active' : ''}" onclick="toggleMain('${item.id}', ${item.is_main})"></i>
+                <i class="fa-solid fa-trash" style="color:var(--danger);cursor:pointer" onclick="deleteNav('${item.id}')"></i>`;
                 list.appendChild(mItem);
             });
             const moreBtn = document.createElement('button'); moreBtn.className = 'nav-item'; moreBtn.onclick = () => toggleModal('moreSheet', true);
             moreBtn.innerHTML = `<i class="fa-solid fa-bars"></i><span>More</span>`; main.appendChild(moreBtn);
-            if(init && data && data[0]) openPage(data[0].url);
+            if(init && data?.[0]) openPage(data[0].url);
+            new Sortable(list, { animation: 150, handle: '.fa-grip-vertical', onEnd: saveOrder });
         }
-        async function handleSubmit() {
-            const name = document.getElementById('n_name').value; const url = document.getElementById('n_url').value; const icon = document.getElementById('n_icon').value;
-            await client.from('navigations').insert([{ name, url, icon_class: icon, order_index: 99 }]); loadData();
+        async function saveOrder() {
+            const items = document.querySelectorAll('#manageList .manage-item');
+            for(let i=0; i<items.length; i++) { await client.from('navigations').update({ order_index: i }).eq('id', items[i].dataset.id); }
+            loadData();
         }
-        async function deleteNav(id) { await client.from('navigations').delete().eq('id', id); loadData(); }
+        async function toggleMain(id, current) { await client.from('navigations').update({ is_main: !current }).eq('id', id); loadData(); }
         function openPage(url) {
             const id = 'f-' + btoa(url).replace(/=/g, ''); let frame = document.getElementById(id);
             if(!frame) { frame = document.createElement('iframe'); frame.id = id; frame.className = 'page-frame'; frame.src = url; document.getElementById('frameStore').appendChild(frame); }
             document.querySelectorAll('.page-frame').forEach(f => f.classList.remove('active')); frame.classList.add('active');
-            document.querySelectorAll('.nav-trigger').forEach(btn => { if(btn.dataset.url === url) btn.classList.add('active'); else btn.classList.remove('active'); });
+            document.querySelectorAll('.nav-trigger').forEach(btn => btn.classList.toggle('active', btn.dataset.url === url));
         }
+        function showNotify(msg) { const t = document.getElementById('toast'); document.getElementById('toastMsg').innerText = msg; t.classList.add('show'); setTimeout(() => t.classList.remove('show'), 3000); }
+        function closeAllModals() {
+            document.querySelectorAll('.bottom-sheet').forEach(s => s.classList.remove('show'));
+            document.getElementById('mainNav').classList.remove('active');
+            const o = document.getElementById('overlay'); o.classList.remove('show');
+            setTimeout(() => { if (!o.classList.contains('show')) o.style.display = 'none'; }, 300);
+        }
+        document.getElementById('overlay').onclick = closeAllModals;
         function toggleModal(id, show) {
             const m = document.getElementById(id); const o = document.getElementById('overlay');
             if(show) { o.style.display = 'block'; setTimeout(() => { o.classList.add('show'); m.classList.add('show'); }, 10); }
-            else { m.classList.remove('show'); o.classList.remove('show'); setTimeout(() => o.style.display = 'none', 300); }
+            else { closeAllModals(); }
         }
-        function closeAllModals() { document.querySelectorAll('.bottom-sheet').forEach(s => s.classList.remove('show')); const o = document.getElementById('overlay'); o.classList.remove('show'); setTimeout(() => o.style.display = 'none', 300); }
+        async function handleLogout() { await client.auth.signOut(); window.location.href = 'index.html'; }
+        async function handleSubmit() {
+            const name = document.getElementById('n_name').value; const url = document.getElementById('n_url').value; const icon = document.getElementById('n_icon').value;
+            await client.from('navigations').insert([{ name, url, icon_class: icon, is_main: false, order_index: 99 }]); loadData();
+        }
+        async function deleteNav(id) { if(confirm('Delete this menu?')) { await client.from('navigations').delete().eq('id', id); loadData(); } }
         function openManage() { toggleModal('moreSheet', false); setTimeout(() => toggleModal('manageSheet', true), 300); }
         function openSettingsSheet() { toggleModal('manageSheet', false); setTimeout(() => toggleModal('settingsSheet', true), 300); }
         function backToMore() { toggleModal('manageSheet', false); setTimeout(() => toggleModal('moreSheet', true), 300); }
         function backToManage() { toggleModal('settingsSheet', false); setTimeout(() => toggleModal('manageSheet', true), 300); }
-        document.getElementById('dockTrigger').onmouseenter = () => { if (window.innerWidth > 768) { document.getElementById('mainNav').classList.add('active'); document.getElementById('overlay').style.display = 'block'; setTimeout(() => document.getElementById('overlay').classList.add('show'), 10); } };
+        document.getElementById('dockTrigger').onmouseenter = () => { if (window.innerWidth > 768) { document.getElementById('mainNav').classList.add('active'); const o = document.getElementById('overlay'); o.style.display = 'block'; setTimeout(() => o.classList.add('show'), 10); } };
         checkAuth();
     </script>
 </body>
