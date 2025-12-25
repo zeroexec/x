@@ -10,45 +10,44 @@
     <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
     <style>
         :root { --bg: #000; --nav-bg: #121212; --accent: #00e5ff; --text: #fff; --text-dim: #888; --border: #222; --danger: #ff4d4d; --success: #00ff88; }
-        * { scrollbar-width: thin; scrollbar-color: #333 var(--bg); }
-        ::-webkit-scrollbar { width: 6px; height: 6px; }
-        ::-webkit-scrollbar-track { background: var(--bg); }
+        * { box-sizing: border-box; scrollbar-width: thin; scrollbar-color: #333 var(--bg); }
+        ::-webkit-scrollbar { width: 6px; }
         ::-webkit-scrollbar-thumb { background: #333; border-radius: 10px; }
-        ::-webkit-scrollbar-thumb:hover { background: var(--accent); }
         body, html { margin: 0; height: 100%; background: var(--bg); font-family: sans-serif; overflow: hidden; color: white; }
-        #lockOverlay { position: fixed; inset: 0; background: #000; display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 9999; transition: opacity 0.5s ease; }
+        #lockOverlay { position: fixed; inset: 0; background: #000; display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 9999; transition: opacity 0.5s; }
         #lockOverlay i { font-size: 80px; color: var(--accent); margin-bottom: 20px; }
         #mainApp { display: none; height: 100%; width: 100%; }
         .main-container { position: absolute; top: 0; width: 100%; height: 100%; z-index: 1; }
-        .page-frame { width: 100%; height: 100%; border: none; background: #fff; display: none; }
+        .page-frame { width: 100%; height: 100%; border: none; display: none; background: #fff; }
         .page-frame.active { display: block; }
-        .bottom-nav { position: fixed; bottom: 0; width: 100%; height: 70px; background: var(--nav-bg); border-top: 1px solid var(--border); display: flex; justify-content: space-around; align-items: center; z-index: 210; transition: 0.3s; }
+        .bottom-nav { position: fixed; bottom: 0; width: 100%; height: 70px; background: var(--nav-bg); border-top: 1px solid var(--border); display: flex; justify-content: space-around; align-items: center; z-index: 210; transition: 0.3s ease; }
         @media (min-width: 769px) {
-            .bottom-nav { left: 50%; bottom: 20px; width: auto; min-width: 350px; padding: 0 20px; border-radius: 20px; transform: translateX(-50%) translateY(150%); opacity: 0; pointer-events: none; border: 1px solid var(--border); }
+            .bottom-nav { left: 50%; bottom: 20px; width: auto; min-width: 380px; padding: 0 20px; border-radius: 20px; transform: translateX(-50%) translateY(150%); opacity: 0; pointer-events: none; border: 1px solid var(--border); }
             .bottom-nav.active { transform: translateX(-50%) translateY(0); opacity: 1; pointer-events: auto; }
         }
-        .nav-item { background: none; border: none; color: var(--text-dim); font-size: 11px; cursor: pointer; display: flex; flex-direction: column; align-items: center; padding: 0 15px; transition: 0.2s; position: relative; }
-        .nav-item i { font-size: 22px; margin-bottom: 4px; color: inherit; }
-        .nav-item.active { color: var(--accent); }
+        .nav-item { background: none; border: none; color: var(--text-dim); font-size: 11px; cursor: pointer; display: flex; flex-direction: column; align-items: center; padding: 0 15px; transition: 0.2s; }
+        .nav-item i { font-size: 22px; margin-bottom: 4px; }
+        .nav-item.active, .nav-item:hover { color: var(--accent); }
         .overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.8); display: none; z-index: 200; opacity: 0; transition: opacity 0.3s; }
         .overlay.show { opacity: 1; }
-        .bottom-sheet { position: fixed; bottom: 0; width: 100%; background: var(--nav-bg); border-radius: 20px 20px 0 0; z-index: 300; padding: 15px 0; transform: translateY(100%); transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
+        .bottom-sheet { position: fixed; bottom: 0; width: 100%; background: var(--nav-bg); border-radius: 25px 25px 0 0; z-index: 300; padding: 20px 0; transform: translateY(100%); transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1); }
         .bottom-sheet.show { transform: translateY(0); }
-        .sheet-header { display: flex; justify-content: space-between; align-items: center; padding: 0 20px 15px; border-bottom: 1px solid var(--border); }
-        .manage-item { display: flex; align-items: center; padding: 12px; background: #1a1a1a; margin-bottom: 8px; border-radius: 10px; border: 1px solid #222; }
-        .manage-item.sortable-ghost { opacity: 0.4; background: var(--accent); }
-        .btn-action { width: 100%; padding: 14px; background: var(--accent); border: none; border-radius: 12px; font-weight: bold; cursor: pointer; color: #000; }
-        .add-form input { width: 100%; padding: 12px; margin-bottom: 8px; background: #222; border: 1px solid #333; color: #fff; border-radius: 8px; box-sizing: border-box; }
+        .sheet-header { display: flex; justify-content: space-between; align-items: center; padding: 0 25px 20px; border-bottom: 1px solid var(--border); }
+        .manage-item { display: flex; align-items: center; padding: 12px; background: #1a1a1a; margin-bottom: 8px; border-radius: 12px; border: 1px solid #222; }
+        .btn-action { width: 100%; padding: 15px; background: var(--accent); border: none; border-radius: 12px; font-weight: bold; cursor: pointer; color: #000; transition: 0.2s; }
+        .btn-action:disabled { opacity: 0.5; cursor: not-allowed; }
+        .add-form input { width: 100%; padding: 12px; margin-bottom: 10px; background: #222; border: 1px solid #333; color: #fff; border-radius: 10px; }
         #toast { position: fixed; top: -100px; left: 50%; transform: translateX(-50%); background: #222; color: #fff; padding: 12px 25px; border-radius: 50px; border: 1px solid var(--border); z-index: 10000; transition: 0.5s; font-size: 14px; }
-        #toast.show { top: 20px; }
-        .star-btn { cursor: pointer; margin: 0 15px; transition: 0.3s; }
+        #toast.show { top: 25px; }
+        .star-btn { cursor: pointer; margin: 0 12px; transition: 0.2s; }
         .star-btn.active { color: var(--accent); }
-        .dock-trigger { display: none; position: fixed; bottom: 0; left: 0; width: 100%; height: 15px; z-index: 205; background: transparent; }
+        .dock-trigger { display: none; position: fixed; bottom: 0; width: 100%; height: 15px; z-index: 205; }
         @media (min-width: 769px) { .dock-trigger { display: block; } }
+        .file-box { display: block; padding: 20px; background: #1a1a1a; border: 2px dashed #333; border-radius: 12px; text-align: center; cursor: pointer; margin-bottom: 15px; color: var(--text-dim); }
     </style>
 </head>
 <body>
-    <div id="lockOverlay"><i class="fa-solid fa-lock"></i><p>VERIFYING ACCESS...</p></div>
+    <div id="lockOverlay"><i class="fa-solid fa-lock"></i><p>SECURE ACCESS</p></div>
     <div id="toast"><span id="toastMsg"></span></div>
     <div id="mainApp">
         <div class="main-container" id="frameStore"></div>
@@ -56,26 +55,31 @@
         <nav class="bottom-nav" id="mainNav"></nav>
         <div class="overlay" id="overlay"></div>
         <div class="bottom-sheet" id="moreSheet">
-            <div class="sheet-header"><span>Explore</span><button class="nav-item" onclick="openManage()" style="color:var(--accent)"><i class="fa-solid fa-gear"></i></button></div>
-            <div id="moreNavGrid" style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px 10px; padding: 25px 15px; max-height: 50vh; overflow-y:auto;"></div>
+            <div class="sheet-header"><span>Library</span><button class="nav-item" onclick="openManage()" style="color:var(--accent)"><i class="fa-solid fa-layer-group"></i></button></div>
+            <div id="moreNavGrid" style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px 10px; padding: 25px; max-height: 50vh; overflow-y:auto;"></div>
         </div>
         <div class="bottom-sheet" id="manageSheet">
-            <div class="sheet-header"><button onclick="backToMore()" style="background:none; border:none; color:var(--text-dim);"><i class="fa-solid fa-chevron-left"></i></button><span>Navigation Manager</span><button onclick="openSettingsSheet()" style="background:none; border:none; color:var(--accent);"><i class="fa-solid fa-sliders"></i></button></div>
+            <div class="sheet-header"><button onclick="backToMore()" style="background:none; border:none; color:var(--text-dim);"><i class="fa-solid fa-arrow-left"></i></button><span>Editor</span><button onclick="openSettingsSheet()" style="background:none; border:none; color:var(--accent);"><i class="fa-solid fa-sliders"></i></button></div>
             <div class="add-form" style="padding:20px;">
-                <input type="text" id="n_name" placeholder="Name">
-                <input type="text" id="n_url" placeholder="URL (https://)">
-                <input type="text" id="n_icon" placeholder="Icon (e.g., fa-solid fa-house)">
-                <button class="btn-action" onclick="handleSubmit()">ADD NEW MENU</button>
+                <input type="hidden" id="edit_id">
+                <input type="text" id="n_name" placeholder="Title">
+                <input type="text" id="n_url" placeholder="URL (https://...)">
+                <input type="text" id="n_icon" placeholder="Icon Class (fa-solid fa-...)">
+                <div style="display:flex; gap:10px;">
+                    <button id="btn_submit" class="btn-action" onclick="handleSubmit()">SAVE MENU</button>
+                    <button id="btn_cancel" class="btn-action" style="background:#222; color:#fff; display:none;" onclick="resetForm()">CANCEL</button>
+                </div>
             </div>
-            <div id="manageList" style="padding: 10px 20px; max-height: 40vh; overflow-y:auto;"></div>
-            <div style="padding: 10px 20px;"><button onclick="handleLogout()" style="width:100%; background:none; border:1px solid var(--danger); color:var(--danger); padding:10px; border-radius:8px; cursor:pointer;">SIGN OUT</button></div>
+            <div id="manageList" style="padding: 10px 20px; max-height: 35vh; overflow-y:auto;"></div>
+            <div style="padding: 10px 20px;"><button onclick="handleLogout()" style="width:100%; background:none; border:1px solid var(--danger); color:var(--danger); padding:12px; border-radius:10px; cursor:pointer;">LOGOUT</button></div>
         </div>
         <div class="bottom-sheet" id="settingsSheet">
-            <div class="sheet-header"><button onclick="backToManage()" style="background:none; border:none; color:var(--text-dim);"><i class="fa-solid fa-chevron-left"></i></button><span>Site Settings</span><div style="width:24px"></div></div>
+            <div class="sheet-header"><button onclick="backToManage()" style="background:none; border:none; color:var(--text-dim);"><i class="fa-solid fa-arrow-left"></i></button><span>Site Setup</span><div style="width:24px"></div></div>
             <div style="padding: 20px;">
-                <input type="text" id="s_title" placeholder="Site Title" style="width:100%; padding:12px; margin-bottom:10px; background:#222; border:1px solid #333; color:#fff; border-radius:8px;">
-                <input type="file" id="s_fav_file" accept="image/*" style="display:none" onchange="updateSettings()">
-                <button class="btn-action" onclick="document.getElementById('s_fav_file').click()">CHANGE FAVICON</button>
+                <input type="text" id="s_title" placeholder="Console Title" style="width:100%; padding:12px; margin-bottom:15px; background:#222; border:1px solid #333; color:#fff; border-radius:10px;">
+                <label class="file-box" for="s_fav_file" id="favLabel"><i class="fa-solid fa-upload" style="display:block;margin-bottom:8px"></i>Favicon Image</label>
+                <input type="file" id="s_fav_file" accept="image/*" style="display:none" onchange="previewFav()">
+                <button class="btn-action" id="btn_save_settings" onclick="updateSettings()">APPLY CHANGES</button>
             </div>
         </div>
     </div>
@@ -95,24 +99,35 @@
         }
         async function loadSettings() {
             const { data } = await client.from('settings').select('*').eq('id', 1).maybeSingle();
-            if(data) { document.title = data.site_title; updateFavicon(data.site_favicon); document.getElementById('s_title').value = data.site_title; }
+            if(data) { document.title = data.site_title; setFavicon(data.site_favicon); document.getElementById('s_title').value = data.site_title; }
         }
-        function updateFavicon(url) {
-            let link = document.querySelector("link[rel~='icon']");
-            if (!link) { link = document.createElement('link'); link.rel = 'icon'; document.head.appendChild(link); }
+        function setFavicon(url) {
+            if(!url) return;
+            let link = document.getElementById('favicon');
+            if (!link) { link = document.createElement('link'); link.id = 'favicon'; link.rel = 'icon'; document.head.appendChild(link); }
             link.href = url + '?t=' + Date.now();
         }
-        async function updateSettings() {
-            const title = document.getElementById('s_title').value;
+        function previewFav() {
             const file = document.getElementById('s_fav_file').files[0];
-            let favUrl = document.querySelector("link[rel~='icon']").href.split('?')[0];
-            if (file) {
-                const path = `fav-${Date.now()}`;
-                await client.storage.from('assets').upload(path, file);
-                favUrl = client.storage.from('assets').getPublicUrl(path).data.publicUrl;
-            }
-            await client.from('settings').update({ site_title: title, site_favicon: favUrl }).eq('id', 1);
-            loadSettings(); showNotify("Settings Saved");
+            if(file) document.getElementById('favLabel').innerText = file.name;
+        }
+        async function updateSettings() {
+            const btn = document.getElementById('btn_save_settings');
+            const title = document.getElementById('s_title').value;
+            const fileInput = document.getElementById('s_fav_file');
+            let currentUrl = document.getElementById('favicon')?.href.split('?')[0];
+            btn.disabled = true; btn.innerText = "UPDATING...";
+            try {
+                if (fileInput.files.length > 0) {
+                    const file = fileInput.files[0];
+                    const fileName = `fav-${Date.now()}`;
+                    await client.storage.from('assets').upload(fileName, file);
+                    currentUrl = client.storage.from('assets').getPublicUrl(fileName).data.publicUrl;
+                }
+                await client.from('settings').update({ site_title: title, site_favicon: currentUrl }).eq('id', 1);
+                showNotify("Updated Successfully"); loadSettings(); closeAllModals();
+            } catch (e) { showNotify("Update Failed"); }
+            finally { btn.disabled = false; btn.innerText = "APPLY CHANGES"; }
         }
         async function loadData(init = false) {
             const { data } = await client.from('navigations').select('*').order('order_index');
@@ -125,12 +140,13 @@
                 if(item.is_main) main.appendChild(btn); else more.appendChild(btn);
                 const mItem = document.createElement('div'); mItem.className = 'manage-item'; mItem.dataset.id = item.id;
                 mItem.innerHTML = `<i class="fa-solid fa-grip-vertical" style="color:#444;cursor:grab"></i><span style="flex:1;margin-left:15px">${item.name}</span>
+                <i class="fa-solid fa-pen" style="color:var(--accent);cursor:pointer;margin-right:15px" onclick="editNav('${item.id}', '${item.name}', '${item.url}', '${item.icon_class}')"></i>
                 <i class="fa-solid fa-star star-btn ${item.is_main ? 'active' : ''}" onclick="toggleMain('${item.id}', ${item.is_main})"></i>
                 <i class="fa-solid fa-trash" style="color:var(--danger);cursor:pointer" onclick="deleteNav('${item.id}')"></i>`;
                 list.appendChild(mItem);
             });
             const moreBtn = document.createElement('button'); moreBtn.className = 'nav-item'; moreBtn.onclick = () => toggleModal('moreSheet', true);
-            moreBtn.innerHTML = `<i class="fa-solid fa-bars"></i><span>More</span>`; main.appendChild(moreBtn);
+            moreBtn.innerHTML = `<i class="fa-solid fa-ellipsis"></i><span>More</span>`; main.appendChild(moreBtn);
             if(init && data?.[0]) openPage(data[0].url);
             new Sortable(list, { animation: 150, handle: '.fa-grip-vertical', onEnd: saveOrder });
         }
@@ -139,7 +155,25 @@
             for(let i=0; i<items.length; i++) { await client.from('navigations').update({ order_index: i }).eq('id', items[i].dataset.id); }
             loadData();
         }
+        function editNav(id, name, url, icon) {
+            document.getElementById('edit_id').value = id; document.getElementById('n_name').value = name;
+            document.getElementById('n_url').value = url; document.getElementById('n_icon').value = icon;
+            document.getElementById('btn_submit').innerText = "UPDATE"; document.getElementById('btn_cancel').style.display = "block";
+        }
+        function resetForm() {
+            document.getElementById('edit_id').value = ""; document.getElementById('n_name').value = "";
+            document.getElementById('n_url').value = ""; document.getElementById('n_icon').value = "";
+            document.getElementById('btn_submit').innerText = "SAVE MENU"; document.getElementById('btn_cancel').style.display = "none";
+        }
+        async function handleSubmit() {
+            const id = document.getElementById('edit_id').value; const n = document.getElementById('n_name').value;
+            const u = document.getElementById('n_url').value; const i = document.getElementById('n_icon').value;
+            if(id) await client.from('navigations').update({ name: n, url: u, icon_class: i }).eq('id', id);
+            else await client.from('navigations').insert([{ name: n, url: u, icon_class: i, is_main: false, order_index: 99 }]);
+            resetForm(); loadData(); showNotify("Data Saved");
+        }
         async function toggleMain(id, current) { await client.from('navigations').update({ is_main: !current }).eq('id', id); loadData(); }
+        async function deleteNav(id) { if(confirm('Delete?')) { await client.from('navigations').delete().eq('id', id); loadData(); } }
         function openPage(url) {
             const id = 'f-' + btoa(url).replace(/=/g, ''); let frame = document.getElementById(id);
             if(!frame) { frame = document.createElement('iframe'); frame.id = id; frame.className = 'page-frame'; frame.src = url; document.getElementById('frameStore').appendChild(frame); }
@@ -160,11 +194,6 @@
             else { closeAllModals(); }
         }
         async function handleLogout() { await client.auth.signOut(); window.location.href = 'index.html'; }
-        async function handleSubmit() {
-            const name = document.getElementById('n_name').value; const url = document.getElementById('n_url').value; const icon = document.getElementById('n_icon').value;
-            await client.from('navigations').insert([{ name, url, icon_class: icon, is_main: false, order_index: 99 }]); loadData();
-        }
-        async function deleteNav(id) { if(confirm('Delete this menu?')) { await client.from('navigations').delete().eq('id', id); loadData(); } }
         function openManage() { toggleModal('moreSheet', false); setTimeout(() => toggleModal('manageSheet', true), 300); }
         function openSettingsSheet() { toggleModal('manageSheet', false); setTimeout(() => toggleModal('settingsSheet', true), 300); }
         function backToMore() { toggleModal('manageSheet', false); setTimeout(() => toggleModal('moreSheet', true), 300); }
