@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Neural Core System</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        :root { 
+            --accent: #00e5ff; 
+            --accent-rgb: 0, 229, 255; 
+            --bg: #000; 
+        }
+        body, html { 
+            margin: 0; padding: 0; width: 100%; height: 100%; 
+            background: var(--bg); overflow: hidden; 
+            font-family: 'Courier New', monospace;
+            cursor: none;
+        }
+        canvas { position: fixed; inset: 0; }
+        #particle-canvas { z-index: 1; }
+        #cursor-canvas { z-index: 9999; pointer-events: none; }
+        .system-root {
+            position: relative; z-index: 10; width: 100%; height: 100%;
+            display: flex; flex-direction: column; justify-content: center; align-items: center;
+            background: radial-gradient(circle at center, rgba(var(--accent-rgb), 0.05) 0%, transparent 70%);
+        }
+        .entity-container {
+            position: relative; padding: 100px;
+            display: flex; justify-content: center; align-items: center;
+            opacity: 0; transform: scale(0.9);
+            transition: all 2s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+        .entity-container.active { opacity: 1; transform: scale(1); }
+        #displayLogo {
+            max-width: 280px; max-height: 280px;
+            position: relative; z-index: 5;
+            animation: breath 5s ease-in-out infinite;
+        }
+        .hologram-ring {
+            position: absolute; border: 1px solid var(--accent);
+            border-radius: 50%; opacity: 0.3;
+            animation: pulse-ring 4s cubic-bezier(0.215, 0.61, 0.355, 1) infinite;
+        }
+        .ring-inner { width: 320px; height: 320px; border-width: 2px; }
+        .ring-outer { width: 450px; height: 450px; border-style: double; animation-delay: -1s; }
+        .terminal-box {
+            position: absolute; bottom: 30px; left: 30px;
+            color: var(--accent); font-size: 11px; text-transform: uppercase;
+            letter-spacing: 2px; opacity: 0.7;
+        }
+        @keyframes breath {
+            0%, 100% { transform: scale(1); filter: brightness(1) drop-shadow(0 0 20px var(--accent)); }
+            50% { transform: scale(1.05); filter: brightness(1.3) drop-shadow(0 0 40px var(--accent)); }
+        }
+        @keyframes pulse-ring {
+            0% { transform: scale(0.8); opacity: 0.5; }
+            100% { transform: scale(1.3); opacity: 0; }
+        }
+    </style>
+</head>
+<body>
+
+    <canvas id="particle-canvas"></canvas>
+    <canvas id="cursor-canvas"></canvas>
+
+    <div class="system-root">
+        <div class="entity-container" id="mainCore">
+            <div class="hologram-ring ring-inner"></div>
+            <div class="hologram-ring ring-outer"></div>
+            <img id="displayLogo" src="" alt="System Entity">
+        </div>
+        <div class="terminal-box">
+            <div>> CONNECTION_STATE: ENCRYPTED</div>
+            <div>> MOUSE_STREAM: CAPTURING_CORE</div>
+            <div style="color: #fff">> STATUS: STANDBY_MODE</div>
+        </div>
+    </div>
+
+    <script>
+        const client = supabase.createClient('https://nynowiamkpddohtaoqvt.supabase.co', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im55bm93aWFta3BkZG9odGFvcXZ0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjY2MzQyODEsImV4cCI6MjA4MjIxMDI4MX0.vN7m2SUztxtHUROEMOqtbqMGRPehM9UJZP_VSsVMRtw');
+        const pCanvas = document.getElementById('particle-canvas');
+        const pCtx = pCanvas.getContext('2d');
+        const cCanvas = document.getElementById('cursor-canvas');
+        const cCtx = cCanvas.getContext('2d');
+        let particles = [];
+        let mouseParticles = [];
+        let mx = 0, my = 0;
+
+        function resize() {
+            pCanvas.width = cCanvas.width = window.innerWidth;
+            pCanvas.height = cCanvas.height = window.innerHeight;
+        }
+
+        class FireParticle {
+            constructor(x, y) {
+                this.x = x;
+                this.y = y;
+                this.size = Math.random() * 15 + 5;
+                this.speedY = Math.random() * -3 - 1;
+                this.speedX = (Math.random() - 0.5) * 2;
+                this.life = 1;
+            }
+            update() {
+                this.x += this.speedX;
+                this.y += this.speedY;
+                this.size *= 0.95;
+                this.life -= 0.02;
+            }
+            draw() {
+                cCtx.fillStyle = `hsla(185, 100%, 50%, ${this.life})`;
+                cCtx.beginPath();
+                cCtx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+                cCtx.fill();
+            }
+        }
+
+        window.addEventListener('mousemove', (e) => {
+            mx = e.clientX;
+            my = e.clientY;
+            for(let i=0; i<3; i++) {
+                mouseParticles.push(new FireParticle(mx, my));
+            }
+        });
+
+        function animate() {
+            pCtx.clearRect(0,0,pCanvas.width, pCanvas.height);
+            pCtx.fillStyle = 'rgba(0, 229, 255, 0.5)';
+            particles.forEach(p => {
+                p.x += p.vx; p.y += p.vy;
+                if(p.x < 0 || p.x > pCanvas.width) p.vx *= -1;
+                if(p.y < 0 || p.y > pCanvas.height) p.vy *= -1;
+                pCtx.fillRect(p.x, p.y, 2, 2);
+            });
+            cCtx.clearRect(0,0,cCanvas.width, cCanvas.height);
+            cCtx.strokeStyle = '#fff';
+            cCtx.lineWidth = 2;
+            cCtx.beginPath();
+            cCtx.arc(mx, my, 8, 0, Math.PI * 2);
+            cCtx.stroke();
+            for(let i = 0; i < mouseParticles.length; i++){
+                mouseParticles[i].update();
+                mouseParticles[i].draw();
+                if(mouseParticles[i].life <= 0) {
+                    mouseParticles.splice(i, 1);
+                    i--;
+                }
+            }
+            requestAnimationFrame(animate);
+        }
+
+        async function init() {
+            resize();
+            for(let i=0; i<80; i++) {
+                particles.push({
+                    x: Math.random() * pCanvas.width,
+                    y: Math.random() * pCanvas.height,
+                    vx: (Math.random() - 0.5) * 0.5,
+                    vy: (Math.random() - 0.5) * 0.5
+                });
+            }
+            animate();
+            const { data } = await client.from('settings').select('site_favicon').eq('id', 1).maybeSingle();
+            if (data?.site_favicon) {
+                const img = document.getElementById('displayLogo');
+                img.src = data.site_favicon;
+                img.onload = () => document.getElementById('mainCore').classList.add('active');
+            }
+        }
+
+        window.onresize = resize;
+        init();
+    </script>
+</body>
+</html>
