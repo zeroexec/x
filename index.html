@@ -3,322 +3,46 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Private Cloud Console</title>
-    <link id="favicon" rel="icon" href="">
+    <title>Sistem Terkunci</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
-        :root {
-            --bg: #000; --nav-bg: #121212; --accent: #00e5ff;
-            --text: #fff; --text-dim: #888; --border: #222; 
-            --danger: #ff4d4d; --success: #00ff88;
-        }
-
-        * { scrollbar-width: thin; scrollbar-color: #333 var(--bg); }
-        ::-webkit-scrollbar { width: 6px; height: 6px; }
-        ::-webkit-scrollbar-track { background: var(--bg); }
-        ::-webkit-scrollbar-thumb { background: #333; border-radius: 10px; }
-        ::-webkit-scrollbar-thumb:hover { background: var(--accent); }
-
-        body, html { margin: 0; height: 100%; background: var(--bg); font-family: sans-serif; overflow: hidden; color: white; }
-        
-        #lockScreen {
-            position: fixed; inset: 0; background: var(--bg); z-index: 9999;
-            display: flex; flex-direction: column; align-items: center; justify-content: center;
-            padding: 20px; transition: opacity 0.5s ease;
-        }
-        .login-box { width: 100%; max-width: 320px; text-align: center; }
+        :root { --bg: #000; --accent: #00e5ff; --text-dim: #888; }
+        body { margin: 0; background: var(--bg); font-family: sans-serif; display: flex; align-items: center; justify-content: center; height: 100vh; color: white; }
+        .login-box { width: 100%; max-width: 320px; text-align: center; padding: 20px; }
         .login-box i { font-size: 50px; color: var(--accent); margin-bottom: 20px; }
-        .login-box input {
-            width: 100%; padding: 15px; background: #111; border: 1px solid #333;
-            color: #fff; border-radius: 12px; font-size: 20px; text-align: center;
-            letter-spacing: 8px; margin-bottom: 15px; box-sizing: border-box; outline: none;
-        }
-
-        #mainApp { display: none; opacity: 0; transition: opacity 0.5s ease; height: 100%; width: 100%; }
-        .main-container { position: absolute; top: 0; width: 100%; height: 100%; z-index: 1; }
-        .page-frame { width: 100%; height: 100%; border: none; background: #fff; display: none; }
-        .page-frame.active { display: block; }
-        
-        .bottom-nav {
-            position: fixed; bottom: 0; width: 100%; height: 70px;
-            background: var(--nav-bg); border-top: 1px solid var(--border);
-            display: flex; justify-content: space-around; align-items: center; z-index: 210;
-            transition: transform 0.3s ease, opacity 0.3s ease;
-        }
-
-        .dock-trigger { display: none; position: fixed; bottom: 0; left: 0; width: 100%; height: 15px; z-index: 205; background: transparent; }
-
-        @media (min-width: 769px) {
-            .dock-trigger { display: block; }
-            .bottom-nav {
-                left: 50%; bottom: 20px; width: auto; min-width: 350px;
-                padding: 0 20px; border-radius: 20px;
-                transform: translateX(-50%) translateY(150%);
-                opacity: 0; pointer-events: none;
-                border: 1px solid var(--border);
-            }
-            .bottom-nav.active { transform: translateX(-50%) translateY(0); opacity: 1; pointer-events: auto; }
-        }
-
-        .nav-item { background: none; border: none; color: var(--text-dim); font-size: 11px; cursor: pointer; display: flex; flex-direction: column; align-items: center; padding: 0 15px; transition: 0.2s; }
-        .nav-item i { font-size: 22px; margin-bottom: 4px; color: inherit; }
-        .nav-item:hover, .nav-item.active { color: var(--accent); }
-
-        .overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.8); display: none; z-index: 200; opacity: 0; transition: opacity 0.3s; }
-        .overlay.show { opacity: 1; }
-
-        .bottom-sheet {
-            position: fixed; bottom: 0; width: 100%; background: var(--nav-bg);
-            border-radius: 20px 20px 0 0; z-index: 300; padding: 15px 0;
-            transform: translateY(100%); transition: transform 0.3s ease;
-            box-shadow: 0 -5px 20px rgba(0,0,0,0.5);
-        }
-        .bottom-sheet.show { transform: translateY(0); }
-        .sheet-header { display: flex; justify-content: space-between; align-items: center; padding: 0 20px 15px; border-bottom: 1px solid var(--border); }
-        
-        .btn-action { width: 100%; padding: 14px; background: var(--accent); border: none; border-radius: 12px; font-weight: bold; cursor: pointer; color: #000; }
-        .add-form input { width: 100%; padding: 12px; margin-bottom: 8px; background: #222; border: 1px solid #333; color: #fff; border-radius: 8px; box-sizing: border-box; }
-
-        .file-label { display: block; padding: 12px; background: #222; border: 1px dashed #444; border-radius: 8px; text-align: center; cursor: pointer; margin-bottom: 15px; font-size: 13px; color: var(--text-dim); }
-
-        #toast {
-            position: fixed; top: -100px; left: 50%; transform: translateX(-50%);
-            background: #222; color: #fff; padding: 12px 25px; border-radius: 50px;
-            border: 1px solid var(--border); z-index: 10000; transition: 0.5s cubic-bezier(0.18, 0.89, 0.32, 1.28);
-            display: flex; align-items: center; gap: 10px; font-size: 14px;
-        }
-        #toast.show { top: 20px; }
-        #moreNavGrid, #manageList { overflow-y: auto; scrollbar-gutter: stable; }
+        input { width: 100%; padding: 15px; background: #111; border: 1px solid #333; color: #fff; border-radius: 12px; font-size: 20px; text-align: center; letter-spacing: 8px; margin-bottom: 15px; box-sizing: border-box; outline: none; }
+        button { width: 100%; padding: 14px; background: var(--accent); border: none; border-radius: 12px; font-weight: bold; cursor: pointer; color: #000; }
+        #msg { margin-top: 15px; font-size: 13px; color: #ff4d4d; }
     </style>
 </head>
 <body>
-
-    <div id="toast"><i id="toastIcon"></i> <span id="toastMsg"></span></div>
-
-    <div id="lockScreen">
-        <div class="login-box">
-            <i class="fa-solid fa-shield-halved"></i>
-            <h2>System Locked</h2>
-            <p style="color: var(--text-dim); font-size: 13px; margin-bottom: 30px;">Login required to access data.</p>
-            <input type="password" id="adminPass" placeholder="••••" autofocus>
-            <button class="btn-action" id="btnLogin" onclick="handleLogin()">AUTHENTICATE</button>
-        </div>
+    <div class="login-box">
+        <i class="fa-solid fa-shield-halved"></i>
+        <h2>Console Access</h2>
+        <p style="color: var(--text-dim); font-size: 13px; margin-bottom: 30px;">Otentikasi diperlukan.</p>
+        <input type="password" id="pass" placeholder="••••" autofocus>
+        <button id="btn" onclick="handleLogin()">UNLOCK</button>
+        <div id="msg"></div>
     </div>
-
-    <div id="mainApp">
-        <div class="main-container" id="frameStore"></div>
-        <div class="dock-trigger" id="dockTrigger"></div>
-        <nav class="bottom-nav" id="mainNav"></nav>
-        <div class="overlay" id="overlay" onclick="closeAllModals()"></div>
-
-        <div class="bottom-sheet" id="moreSheet">
-            <div class="sheet-header"><span>Explore</span><button class="nav-item" onclick="openManage()" style="color:var(--accent)"><i class="fa-solid fa-gear"></i></button></div>
-            <div id="moreNavGrid" style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px 10px; padding: 25px 15px; max-height: 50vh;"></div>
-        </div>
-
-        <div class="bottom-sheet" id="manageSheet">
-            <div class="sheet-header"><button onclick="backToMore()" style="background:none; border:none; color:var(--text-dim);"><i class="fa-solid fa-chevron-left"></i></button><span>Management</span><button onclick="openSettingsSheet()" style="background:none; border:none; color:var(--accent);"><i class="fa-solid fa-sliders"></i></button></div>
-            <div class="add-form" style="padding:20px;">
-                <input type="text" id="n_name" placeholder="Nama Menu">
-                <input type="text" id="n_url" placeholder="URL">
-                <input type="text" id="n_icon" placeholder="Icon Class">
-                <button class="btn-action" onclick="handleSubmit()">SIMPAN MENU</button>
-            </div>
-            <div id="manageList" style="padding: 10px 20px; max-height: 25vh;"></div>
-            <div style="padding: 10px 20px;"><button onclick="handleLogout()" style="width:100%; background:none; border:1px solid var(--danger); color:var(--danger); padding:10px; border-radius:8px; cursor:pointer;">SIGN OUT</button></div>
-        </div>
-
-        <div class="bottom-sheet" id="settingsSheet">
-            <div class="sheet-header"><button onclick="backToManage()" style="background:none; border:none; color:var(--text-dim);"><i class="fa-solid fa-chevron-left"></i></button><span>Settings</span><div style="width:24px"></div></div>
-            <div style="padding: 20px;">
-                <input type="text" id="s_title" placeholder="Site Title" style="width:100%; padding:12px; margin-bottom:10px; background:#222; border:1px solid #333; color:#fff; border-radius:8px;">
-                <label class="file-label" for="s_fav_file" id="fileLabel"><i class="fa-solid fa-image"></i> Pilih Gambar Favicon</label>
-                <input type="file" id="s_fav_file" accept="image/*" style="display:none" onchange="updateFileLabel()">
-                <button class="btn-action" id="btnUpdate" onclick="updateSettings()">SAVE CHANGES</button>
-            </div>
-        </div>
-    </div>
-
     <script>
-        const SUPABASE_URL = 'https://nynowiamkpddohtaoqvt.supabase.co';
-        const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im55bm93aWFta3BkZG9odGFvcXZ0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjY2MzQyODEsImV4cCI6MjA4MjIxMDI4MX0.vN7m2SUztxtHUROEMOqtbqMGRPehM9UJZP_VSsVMRtw';
-        const client = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-        const ADMIN_EMAIL = 'karyatulissaya@gmail.com';
-
-        function showNotify(msg, type='success') {
-            const t = document.getElementById('toast');
-            document.getElementById('toastMsg').innerText = msg;
-            t.classList.add('show'); setTimeout(() => t.classList.remove('show'), 3000);
-        }
-
-        async function checkInitialAuth() {
-            const { data: { session } } = await client.auth.getSession();
-            if (session) showApp();
-            else document.getElementById('lockScreen').style.display = 'flex';
-        }
-
-        function showApp() {
-            document.getElementById('lockScreen').style.opacity = '0';
-            setTimeout(() => {
-                document.getElementById('lockScreen').style.display = 'none';
-                const app = document.getElementById('mainApp');
-                app.style.display = 'block';
-                setTimeout(() => app.style.opacity = '1', 10);
-                loadSettings();
-                loadData(true);
-            }, 500);
-        }
-
+        const client = supabase.createClient('https://nynowiamkpddohtaoqvt.supabase.co', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im55bm93aWFta3BkZG9odGFvcXZ0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjY2MzQyODEsImV4cCI6MjA4MjIxMDI4MX0.vN7m2SUztxtHUROEMOqtbqMGRPehM9UJZP_VSsVMRtw');
         async function handleLogin() {
-            const pass = document.getElementById('adminPass').value;
-            const btn = document.getElementById('btnLogin');
-            if(!pass) return;
+            const pass = document.getElementById('pass').value;
+            const btn = document.getElementById('btn');
+            const msg = document.getElementById('msg');
             btn.disabled = true; btn.innerText = "VERIFYING...";
-            const { error } = await client.auth.signInWithPassword({ email: ADMIN_EMAIL, password: pass });
+            const { data, error } = await client.auth.signInWithPassword({ email: 'karyatulissaya@gmail.com', password: pass });
             if (error) {
-                showNotify("Access Denied", "error");
-                btn.disabled = false; btn.innerText = "AUTHENTICATE";
+                msg.innerText = "Password Salah";
+                btn.disabled = false; btn.innerText = "UNLOCK";
             } else {
-                showApp();
+                window.location.href = 'home.html';
             }
         }
-
-        async function handleLogout() {
-            await client.auth.signOut();
-            window.location.reload();
-        }
-
-        async function loadSettings() {
-            const { data } = await client.from('settings').select('*').eq('id', 1).single();
-            if(data) {
-                document.title = data.site_title;
-                document.getElementById('favicon').href = data.site_favicon;
-                document.getElementById('s_title').value = data.site_title;
-            }
-        }
-
-        async function loadData(init = false) {
-            const { data } = await client.from('navigations').select('*').order('order_index');
-            const main = document.getElementById('mainNav');
-            const more = document.getElementById('moreNavGrid');
-            const list = document.getElementById('manageList');
-            main.innerHTML = ''; more.innerHTML = ''; list.innerHTML = '';
-            (data || []).forEach(item => {
-                const btn = document.createElement('button');
-                btn.className = 'nav-item nav-trigger';
-                btn.dataset.url = item.url;
-                btn.onclick = () => { openPage(item.url); closeAllModals(); };
-                btn.innerHTML = `<i class="${item.icon_class}"></i><span>${item.name}</span>`;
-                if(item.is_main) main.appendChild(btn); else more.appendChild(btn);
-                const mItem = document.createElement('div');
-                mItem.style = "display:flex; justify-content:space-between; padding:10px 0; border-bottom:1px solid #222;";
-                mItem.innerHTML = `<span>${item.name}</span> <i class="fa-solid fa-trash" style="color:var(--danger); cursor:pointer" onclick="deleteNav('${item.id}')"></i>`;
-                list.appendChild(mItem);
-            });
-            const moreBtn = document.createElement('button');
-            moreBtn.className = 'nav-item';
-            moreBtn.onclick = () => toggleModal('moreSheet', true);
-            moreBtn.innerHTML = `<i class="fa-solid fa-bars"></i><span>More</span>`;
-            main.appendChild(moreBtn);
-            if(init && data && data[0]) openPage(data[0].url);
-        }
-
-        async function updateSettings() {
-            const btn = document.getElementById('btnUpdate');
-            const title = document.getElementById('s_title').value;
-            const fileInput = document.getElementById('s_fav_file');
-            let currentFav = document.getElementById('favicon').href;
-            btn.disabled = true; btn.innerText = "SAVING...";
-            try {
-                if (fileInput.files.length > 0) {
-                    const file = fileInput.files[0];
-                    const fileName = `fav-${Date.now()}`;
-                    await client.storage.from('assets').upload(fileName, file);
-                    const { data } = client.storage.from('assets').getPublicUrl(fileName);
-                    currentFav = data.publicUrl;
-                }
-                const { error } = await client.from('settings').update({ site_title: title, site_favicon: currentFav }).eq('id', 1);
-                if(error) throw error;
-                document.title = title;
-                document.getElementById('favicon').href = currentFav;
-                showNotify("Settings Updated!");
-                closeAllModals();
-            } catch (e) {
-                showNotify("Error updating settings", "error");
-            } finally {
-                btn.disabled = false; btn.innerText = "SAVE CHANGES";
-            }
-        }
-
-        async function handleSubmit() {
-            const name = document.getElementById('n_name').value;
-            const url = document.getElementById('n_url').value;
-            const icon = document.getElementById('n_icon').value;
-            const { error } = await client.from('navigations').insert([{ name, url, icon_class: icon, order_index: 99 }]);
-            if(error) showNotify("Error adding menu", "error");
-            else { showNotify("Berhasil!"); loadData(); }
-        }
-
-        async function deleteNav(id) {
-            const { error } = await client.from('navigations').delete().eq('id', id);
-            if(error) showNotify("Error", "error"); else { showNotify("Dihapus"); loadData(); }
-        }
-
-        function openPage(url) {
-            const id = 'f-' + btoa(url).replace(/=/g, '');
-            let frame = document.getElementById(id);
-            if(!frame) {
-                frame = document.createElement('iframe');
-                frame.id = id; frame.className = 'page-frame'; frame.src = url;
-                document.getElementById('frameStore').appendChild(frame);
-            }
-            document.querySelectorAll('.page-frame').forEach(f => f.classList.remove('active'));
-            frame.classList.add('active');
-            document.querySelectorAll('.nav-trigger').forEach(btn => {
-                if(btn.dataset.url === url) btn.classList.add('active');
-                else btn.classList.remove('active');
-            });
-        }
-
-        function updateFileLabel() {
-            const f = document.getElementById('s_fav_file');
-            if(f.files[0]) document.getElementById('fileLabel').innerHTML = `<i class="fa-solid fa-check" style="color:var(--success)"></i> ${f.files[0].name}`;
-        }
-
-        function toggleModal(id, show) {
-            const m = document.getElementById(id);
-            const o = document.getElementById('overlay');
-            const nav = document.getElementById('mainNav');
-            if(show) { o.style.display = 'block'; setTimeout(() => { o.classList.add('show'); m.classList.add('show'); }, 10); }
-            else { m.classList.remove('show'); o.classList.remove('show'); if (window.innerWidth > 768) nav.classList.remove('active'); setTimeout(() => o.style.display = 'none', 300); }
-        }
-
-        function closeAllModals() {
-            document.querySelectorAll('.bottom-sheet').forEach(s => s.classList.remove('show'));
-            const o = document.getElementById('overlay');
-            const nav = document.getElementById('mainNav');
-            o.classList.remove('show'); if (window.innerWidth > 768) nav.classList.remove('active'); setTimeout(() => o.style.display = 'none', 300);
-        }
-
-        function openManage() { toggleModal('moreSheet', false); setTimeout(() => toggleModal('manageSheet', true), 300); }
-        function openSettingsSheet() { toggleModal('manageSheet', false); setTimeout(() => toggleModal('settingsSheet', true), 300); }
-        function backToMore() { toggleModal('manageSheet', false); setTimeout(() => toggleModal('moreSheet', true), 300); }
-        function backToManage() { toggleModal('settingsSheet', false); setTimeout(() => toggleModal('manageSheet', true), 300); }
-
-        document.getElementById('adminPass').addEventListener('keypress', (e) => { if(e.key === 'Enter') handleLogin(); });
-
-        document.getElementById('dockTrigger').onmouseenter = () => {
-            if (window.innerWidth > 768) {
-                const nav = document.getElementById('mainNav');
-                const overlay = document.getElementById('overlay');
-                nav.classList.add('active');
-                overlay.style.display = 'block';
-                setTimeout(() => overlay.classList.add('show'), 10);
-            }
-        };
-
-        checkInitialAuth();
+        document.getElementById('pass').addEventListener('keypress', (e) => { if(e.key === 'Enter') handleLogin(); });
+        async function check() { const { data } = await client.auth.getSession(); if(data.session) window.location.href = 'home.html'; }
+        check();
     </script>
 </body>
 </html>
