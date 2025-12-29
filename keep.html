@@ -1,0 +1,397 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>KEEP</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
+    <style>
+        :root {
+            --accent-color: #3b82f6;
+            --accent-hover: #2563eb;
+            --main-bg: #0f172a;
+            --sidebar-bg: #1e293b;
+            --paper-bg: #1e293b;
+            --text-color: #f1f5f9;
+            --secondary-text: #94a3b8;
+            --border-color: #334155;
+            --delete-color: #ef4444;
+            --sidebar-width: 280px;
+            --modal-bg: #1e293b;
+        }
+        * { box-sizing: border-box; }
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--main-bg);
+            margin: 0;
+            padding: 0;
+            color: var(--text-color);
+            display: flex;
+            min-height: 100vh;
+        }
+        .sidebar {
+            width: var(--sidebar-width);
+            min-width: var(--sidebar-width);
+            background-color: var(--sidebar-bg); 
+            border-right: 1px solid var(--border-color); 
+            display: flex;
+            flex-direction: column;
+            position: sticky;
+            top: 0;
+            height: 100vh;
+            z-index: 100;
+        }
+        .sidebar-header {
+            padding: 25px;
+            font-weight: 800;
+            font-size: 1.5rem;
+            color: var(--accent-color);
+            letter-spacing: 2px;
+            background-color: var(--sidebar-bg);
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+        .sidebar-content {
+            flex-grow: 1;
+            overflow-y: auto;
+            scrollbar-width: none;
+        }
+        .sidebar-content::-webkit-scrollbar { display: none; }
+        .folder-list-sidebar { list-style: none; padding: 10px; margin: 0; }
+        .folder-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 12px 16px;
+            cursor: pointer;
+            font-size: 0.95rem;
+            transition: all 0.2s;
+            border-radius: 10px;
+            margin-bottom: 5px; 
+            color: var(--secondary-text);
+        }
+        .folder-item:hover { 
+            background-color: rgba(255, 255, 255, 0.05);
+            color: var(--text-color);
+        }
+        .folder-item.active { 
+            background-color: var(--accent-color);
+            font-weight: 600; 
+            color: #ffffff;
+        }
+        .folder-item.active .folder-name i { color: #ffffff; }
+        .folder-name { display: flex; align-items: center; gap: 12px; }
+        .folder-name i { color: var(--secondary-text); width: 20px; text-align: center; }
+        .folder-item:hover .folder-name i { color: var(--text-color); }
+        .delete-folder-btn {
+            background: none; border: none; color: inherit; cursor: pointer;
+            font-size: 0.9rem; padding: 5px; opacity: 0; transition: all 0.2s;
+            display: flex; align-items: center; justify-content: center;
+        }
+        .folder-item:hover .delete-folder-btn { opacity: 0.6; }
+        .delete-folder-btn:hover { opacity: 1 !important; color: var(--delete-color); }
+        .folder-creator { padding: 20px; border-top: 1px solid var(--border-color); background-color: var(--sidebar-bg); }
+        .folder-creator input {
+            width: 100%; padding: 12px; border: 1px solid var(--border-color);
+            border-radius: 8px; margin-bottom: 10px; outline: none;
+            background-color: var(--main-bg); color: var(--text-color);
+            font-family: inherit;
+        }
+        .folder-creator button {
+            width: 100%; padding: 12px; background-color: var(--accent-color);
+            color: #ffffff; border: none; border-radius: 8px; cursor: pointer;
+            font-weight: 600; font-family: inherit;
+        }
+        .main-container { flex-grow: 1; display: flex; flex-direction: column; }
+        .header {
+            background-color: rgba(15, 23, 42, 0.8);
+            backdrop-filter: blur(12px);
+            border-bottom: 1px solid var(--border-color); 
+            padding: 15px 40px;
+            display: flex; align-items: center; 
+            position: sticky; top: 0; z-index: 900; 
+        }
+        .header h1 { margin: 0; font-weight: 700; flex-grow: 1; font-size: 1.25rem; }
+        .active-header-chip { color: var(--text-color); }
+        #menuButton {
+            background: none; border: none; color: var(--text-color);
+            font-size: 1.5rem; cursor: pointer; display: none; margin-right: 15px;
+        }
+        #addNoteButton {
+            width: 42px; height: 42px; border-radius: 12px;
+            background-color: var(--accent-color); color: #ffffff;
+            border: none; cursor: pointer; display: flex; align-items: center; justify-content: center;
+            transition: all 0.2s; box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+            font-size: 1.2rem;
+        }
+        #addNoteButton:hover { transform: scale(1.05); background-color: var(--accent-hover); }
+        .content { padding: 30px 40px; }
+        #notesGrid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 20px;
+        }
+        .note-card {
+            padding: 24px; border-radius: 16px; background-color: var(--paper-bg);
+            border: 1px solid var(--border-color); position: relative; cursor: pointer;
+            transition: all 0.2s; display: flex; flex-direction: column; min-height: 200px;
+        }
+        .note-card:hover { border-color: var(--accent-color); transform: translateY(-2px); }
+        .note-card-title {
+            margin: 0 0 12px 0; font-size: 1.15rem; font-weight: 700; color: var(--text-color);
+            white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+        }
+        .note-card-content {
+            margin: 0; font-size: 0.95rem; color: var(--secondary-text);
+            line-height: 1.6; flex-grow: 1; overflow: hidden;
+            display: -webkit-box; -webkit-line-clamp: 5; -webkit-box-orient: vertical;
+        }
+        .note-card-footer { 
+            display: flex; justify-content: flex-end; align-items: center; gap: 10px; 
+            padding-top: 15px; margin-top: 15px; border-top: 1px solid var(--border-color); font-size: 0.75rem; 
+        }
+        .folder-chip { background-color: rgba(59, 130, 246, 0.1); color: var(--accent-color); padding: 4px 10px; border-radius: 6px; font-weight: 600; }
+        .delete-btn {
+            position: absolute; top: 12px; right: 12px; background: none; border: none;
+            color: var(--secondary-text); cursor: pointer; opacity: 0; transition: all 0.2s;
+        }
+        .note-card:hover .delete-btn { opacity: 0.5; }
+        .delete-btn:hover { opacity: 1 !important; color: var(--delete-color); }
+        .modal-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background-color: rgba(0, 0, 0, 0.6); backdrop-filter: blur(4px);
+            display: none; justify-content: center; align-items: center; z-index: 2000;
+        }
+        .modal-content {
+            background-color: var(--modal-bg); border-radius: 20px;
+            width: 90%; max-width: 800px; padding: 40px; position: relative;
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5);
+            display: flex; flex-direction: column;
+        }
+        .modal-overlay.active { display: flex; }
+        .modal-btn {
+            padding: 12px 24px; border: none; border-radius: 10px;
+            font-weight: 600; cursor: pointer; font-family: inherit;
+        }
+        .modal-btn.action-cancel { background-color: var(--border-color); color: var(--text-color); }
+        .modal-btn.action-safe { background-color: var(--accent-color); color: #ffffff; }
+        #editNoteTitle, #newNoteTitle {
+            font-family: inherit; font-weight: 700; font-size: 1.8rem; border: none; outline: none;
+            width: 100%; background: none; color: var(--text-color); margin-bottom: 15px; resize: none;
+        }
+        #editNoteContent, #newNoteContent {
+            font-family: inherit; font-size: 1.1rem; line-height: 1.7; border: none; outline: none;
+            width: 100%; background: none; color: var(--secondary-text); flex-grow: 1; min-height: 300px; resize: none;
+        }
+        #modalFooter, #addModalFooter {
+            display: flex; justify-content: flex-end; gap: 12px; margin-top: 20px; padding-top: 20px; border-top: 1px solid var(--border-color);
+        }
+        @media (max-width: 768px) {
+            .sidebar { position: fixed; transform: translateX(-100%); transition: transform 0.3s; width: 280px; }
+            .sidebar.active { transform: translateX(0); }
+            #menuButton { display: block; }
+            .content { padding: 20px; }
+            .header { padding: 10px 20px; }
+        }
+    </style>
+</head>
+<body>
+    <nav class="sidebar" id="sidebar">
+        <div class="sidebar-header">KEEP</div>
+        <div class="sidebar-content">
+            <ul class="folder-list-sidebar" id="folderList"></ul>
+        </div>
+        <div class="folder-creator">
+            <input type="text" id="newFolderName" placeholder="Nama folder baru...">
+            <button onclick="addFolder()">Buat Folder</button>
+        </div>
+    </nav>
+    <div class="main-container">
+        <header class="header">
+            <button id="menuButton" onclick="toggleSidebar(true)">☰</button>
+            <h1 id="activeFolderHeader"></h1> 
+            <button id="addNoteButton" onclick="openAddNoteModal()" title="Tambah Catatan">
+                 <i class="fa-regular fa-file"></i>
+            </button>
+        </header>
+        <div class="modal-overlay" id="addNoteModalOverlay">
+            <div class="modal-content">
+                <textarea id="newNoteTitle" placeholder="Judul Catatan" rows="1"></textarea>
+                <textarea id="newNoteContent" placeholder="Mulai menulis sesuatu..." rows="8"></textarea>
+                <div id="addModalFooter">
+                    <button class="modal-btn action-cancel" id="cancelNewNoteBtn">Batal</button> 
+                    <button class="modal-btn action-safe" id="saveNewNoteBtn">Simpan</button>
+                </div>
+            </div>
+        </div>
+        <div class="modal-overlay" id="editModalOverlay">
+            <div class="modal-content">
+                <input type="hidden" id="editNoteId">
+                <textarea id="editNoteTitle" placeholder="Judul" rows="1"></textarea>
+                <textarea id="editNoteContent" placeholder="Isi catatan..." rows="8"></textarea>
+                <div id="modalFooter">
+                    <button class="modal-btn action-cancel" id="cancelEditBtn">Batal</button>
+                    <button class="modal-btn action-safe" id="doneEditBtn">Simpan</button>
+                </div>
+            </div>
+        </div>
+        <div class="modal-overlay" id="confirmationModal">
+            <div class="modal-content" style="max-width: 400px; text-align: center;">
+                <p id="confirmationMessage" style="font-size: 1.1rem; margin-bottom: 25px;"></p>
+                <div style="display: flex; justify-content: center; gap: 10px;">
+                    <button class="modal-btn action-cancel" id="confirmCancel">Batal</button>
+                    <button class="modal-btn action-safe" id="confirmOK" style="background-color: var(--delete-color);">Hapus</button>
+                </div>
+            </div>
+        </div>
+        <main class="content">
+            <div id="notesGrid"></div>
+        </main>
+    </div>
+    <script>
+        const firebaseConfig = {
+            apiKey: "AIzaSyCba6M_spBXvuG91Zn-XWJ4bSTX6vNcST0",
+            authDomain: "index-68220.firebaseapp.com",
+            databaseURL: "https://index-68220-default-rtdb.firebaseio.com",
+            projectId: "index-68220",
+            storageBucket: "index-68220.firebasestorage.app",
+            messagingSenderId: "633087068802",
+            appId: "1:633087068802:web:f8aa1f2ef9c00b99d1429b",
+            measurementId: "G-2VQCRFJQCM"
+        };
+        firebase.initializeApp(firebaseConfig);
+        const database = firebase.database();
+        const notesRef = database.ref('notes');
+        const foldersRef = database.ref('folders');
+        const addNoteModalOverlay = document.getElementById('addNoteModalOverlay');
+        const editModalOverlay = document.getElementById('editModalOverlay');
+        const confirmationModal = document.getElementById('confirmationModal');
+        const notesGrid = document.getElementById('notesGrid');
+        const folderList = document.getElementById('folderList');
+        const activeFolderHeader = document.getElementById('activeFolderHeader');
+        const DEFAULT_FILTER_NAME = 'Semua Catatan';
+        let currentFilter = DEFAULT_FILTER_NAME;
+        let allNotes = {};
+        let availableFolders = {};
+        function autoLink(text) {
+            const urlRegex = /(\b(https?:\/\/\S+)|(www\.\S+))/g;
+            return text.replace(urlRegex, function(url) {
+                let fullUrl = url.match(/^https?:\/\//i) ? url : 'http://' + url;
+                return `<a href="${fullUrl}" target="_blank" onclick="event.stopPropagation();" style="color: var(--accent-color); text-decoration: none;">${url}</a>`;
+            });
+        }
+        function formatTimestamp(isoString) {
+            if (!isoString) return '';
+            const date = new Date(isoString);
+            return date.toLocaleDateString('id-ID', { day: 'numeric', month: 'short' });
+        }
+        window.toggleSidebar = (show) => {
+            document.getElementById('sidebar').classList.toggle('active', show);
+        };
+        window.addFolder = () => {
+            const name = document.getElementById('newFolderName').value.trim();
+            if (name && name !== DEFAULT_FILTER_NAME && !availableFolders[name]) {
+                foldersRef.child(name).set(true).then(() => { document.getElementById('newFolderName').value = ''; });
+            }
+        };
+        window.deleteFolder = (name) => {
+            if (confirm(`Hapus folder '${name}'? Catatan akan dipindahkan ke Semua Catatan.`)) {
+                notesRef.once('value', (snap) => {
+                    const notes = snap.val();
+                    if (notes) {
+                        const updates = {};
+                        Object.keys(notes).forEach(id => { if (notes[id].folder === name) updates[id + '/folder'] = null; });
+                        notesRef.update(updates);
+                    }
+                }).then(() => {
+                    foldersRef.child(name).remove();
+                    if (currentFilter === name) filterNotes(DEFAULT_FILTER_NAME);
+                });
+            }
+        };
+        window.filterNotes = (name) => {
+            currentFilter = name;
+            renderFolders(availableFolders);
+            renderNotes();
+        };
+        function renderFolders(folders) {
+            availableFolders = folders || {};
+            folderList.innerHTML = `<li class="folder-item ${currentFilter === DEFAULT_FILTER_NAME ? 'active' : ''}" onclick="filterNotes('${DEFAULT_FILTER_NAME}'); toggleSidebar(false);"><span class="folder-name"><i class="fa-solid fa-folder-closed"></i> ${DEFAULT_FILTER_NAME}</span></li>`;
+            Object.keys(availableFolders).sort().forEach(name => {
+                folderList.innerHTML += `<li class="folder-item ${currentFilter === name ? 'active' : ''}" onclick="filterNotes('${name}'); toggleSidebar(false);"><span class="folder-name"><i class="fa-solid fa-folder-closed"></i> ${name}</span><button class="delete-folder-btn" onclick="event.stopPropagation(); deleteFolder('${name}')"><i class="fa-solid fa-trash-can"></i></button></li>`;
+            });
+            activeFolderHeader.innerHTML = `<span class="active-header-chip">${currentFilter}</span>`;
+        }
+        function renderNotes() {
+            notesGrid.innerHTML = '';
+            const keys = Object.keys(allNotes).sort((a, b) => (allNotes[b].timestamp || '').localeCompare(allNotes[a].timestamp || ''));
+            keys.forEach(id => {
+                const data = allNotes[id];
+                if ((currentFilter === DEFAULT_FILTER_NAME && !data.folder) || data.folder === currentFilter) {
+                    const card = document.createElement('div');
+                    card.className = 'note-card';
+                    card.onclick = () => openEditModal(id);
+                    card.innerHTML = `<button class="delete-btn" onclick="event.stopPropagation(); deleteNote('${id}')"><i class="fa-solid fa-trash"></i></button><h3 class="note-card-title">${data.title}</h3><p class="note-card-content">${autoLink(data.content)}</p><div class="note-card-footer">${data.folder ? `<span class="folder-chip">${data.folder}</span>` : ''} <span style="color:var(--secondary-text)">${formatTimestamp(data.timestamp)}</span></div>`;
+                    notesGrid.appendChild(card);
+                }
+            });
+        }
+        window.openAddNoteModal = () => {
+            document.getElementById('newNoteTitle').value = '';
+            document.getElementById('newNoteContent').value = '';
+            addNoteModalOverlay.classList.add('active');
+        };
+        document.getElementById('saveNewNoteBtn').onclick = () => {
+            const title = document.getElementById('newNoteTitle').value.trim();
+            const content = document.getElementById('newNoteContent').value.trim();
+            if (title || content) {
+                notesRef.push({ title: title || 'Tanpa Judul', content, folder: currentFilter !== DEFAULT_FILTER_NAME ? currentFilter : null, timestamp: new Date().toISOString() });
+            }
+            addNoteModalOverlay.classList.remove('active');
+        };
+        document.getElementById('cancelNewNoteBtn').onclick = () => addNoteModalOverlay.classList.remove('active');
+        window.openEditModal = (id) => {
+            const data = allNotes[id];
+            document.getElementById('editNoteId').value = id;
+            document.getElementById('editNoteTitle').value = data.title;
+            document.getElementById('editNoteContent').value = data.content;
+            editModalOverlay.classList.add('active');
+        };
+        document.getElementById('doneEditBtn').onclick = () => {
+            const id = document.getElementById('editNoteId').value;
+            notesRef.child(id).update({ title: document.getElementById('editNoteTitle').value, content: document.getElementById('editNoteContent').value, timestamp: new Date().toISOString() });
+            editModalOverlay.classList.remove('active');
+        };
+        document.getElementById('cancelEditBtn').onclick = () => editModalOverlay.classList.remove('active');
+        window.deleteNote = (id) => {
+            document.getElementById('confirmationMessage').textContent = "Hapus catatan ini?";
+            confirmationModal.classList.add('active');
+            document.getElementById('confirmOK').onclick = () => { notesRef.child(id).remove(); confirmationModal.classList.remove('active'); };
+            document.getElementById('confirmCancel').onclick = () => confirmationModal.classList.remove('active');
+        };
+        notesRef.on('value', (snap) => { allNotes = snap.val() || {}; renderNotes(); });
+        foldersRef.on('value', (snap) => renderFolders(snap.val() || {}));
+        document.addEventListener('keydown', (e) => {
+            if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+                e.preventDefault();
+                if (editModalOverlay.classList.contains('active')) document.getElementById('doneEditBtn').click();
+                if (addNoteModalOverlay.classList.contains('active')) document.getElementById('saveNewNoteBtn').click();
+            }
+        });
+    </script>
+    <script>
+    function sendActionToParent(actionType) { if (window.parent !== window) window.parent.postMessage({ type: actionType }, '*'); }
+    document.addEventListener('keydown', function(e) {
+        if ((e.ctrlKey || e.metaKey)) {
+            if (e.key === 'o') { e.preventDefault(); sendActionToParent('OPEN_SEARCH_MODAL'); }
+            if (e.key === 'l') { e.preventDefault(); sendActionToParent('OPEN_LOGIN_MODAL'); }
+            if (e.key === 'u') { e.preventDefault(); sendActionToParent('OPEN_CHANGE_CREDS_MODAL'); }
+        }
+    });
+    </script>
+</body>
+</html>
