@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Note & Task</title>
+    <title>Long Drive Hub</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
@@ -91,8 +91,9 @@
         <div class="panel-h">
             <h2><i class="fas fa-folder-open"></i> Notes</h2>
             <div style="display: flex; gap: 8px;">
-                <button class="btn-add" onclick="openEditor('note', 'folder')"><i class="fas fa-folder-plus"></i></button>
-                <button class="btn-add" onclick="openEditor('note', 'item')"><i class="fas fa-plus"></i></button>
+                <button class="btn-add" title="New Folder" onclick="openEditor('note', 'folder')"><i class="fas fa-folder-plus"></i></button>
+                <button class="btn-add" title="New Link" onclick="openEditor('note', 'link')"><i class="fas fa-link"></i></button>
+                <button class="btn-add" title="New Note" onclick="openEditor('note', 'item')"><i class="fas fa-plus"></i></button>
             </div>
         </div>
         <div id="note-path" class="breadcrumb"></div>
@@ -131,7 +132,7 @@
     const TBL = 'personal_hub';
 
     let rawData = [];
-    let state = { currentPid: null, path: [], selectedIds: [], clipboard: { ids: [], mode: null }, activeItem: null, activeCategory: null, activeType: null, modalAction: null };
+    let state = { currentPid: null, path: [], selectedIds: [], clipboard: { ids: [], mode: null }, activeItem: null, activeCategory: null, activeType: null, modalAction: null, pendingDeleteIds: [] };
 
     async function showProgress(text, type = 'process') {
         const modal = document.getElementById('status-modal');
@@ -165,10 +166,21 @@
                 const div = document.createElement('div');
                 div.className = `item-note ${state.selectedIds.includes(item.id) ? 'selected' : ''}`;
                 const isFolder = item.type === 'folder';
+                const isLink = item.type === 'link';
+                
+                let iconClass = 'fa-file-lines';
+                let iconColor = 'var(--accent)';
+                if(isFolder) { iconClass = 'fa-folder'; iconColor = '#ffca28'; }
+                if(isLink) { iconClass = 'fa-link'; iconColor = '#4caf50'; }
+
                 div.onclick = (e) => { e.stopPropagation(); handleSelection(e, item); };
-                div.ondblclick = () => isFolder ? enterFolder(item) : editNote(item);
+                div.ondblclick = () => {
+                    if(isFolder) enterFolder(item);
+                    else if(isLink) window.open(item.content.startsWith('http') ? item.content : 'https://' + item.content, '_blank');
+                    else editNote(item);
+                };
                 div.oncontextmenu = (e) => { e.stopPropagation(); showContextMenu(e, item); };
-                div.innerHTML = `<span class="note-t"><i class="fas ${isFolder ? 'fa-folder' : 'fa-file-lines'}" style="color:${isFolder ? '#ffca28' : 'var(--accent)'}"></i> ${item.title}</span>`;
+                div.innerHTML = `<span class="note-t"><i class="fas ${iconClass}" style="color:${iconColor}"></i> ${item.title}</span>`;
                 noteList.appendChild(div);
             }
         });
@@ -179,7 +191,12 @@
         state.selectedIds = [item.id];
         render();
         const menu = document.getElementById('ctx-menu');
-        menu.innerHTML = `<div class="ctx-item" onclick="copyItems()"><i class="fas fa-copy"></i> Copy</div><div class="ctx-item" onclick="cutItems()"><i class="fas fa-cut"></i> Cut</div><div class="ctx-item" onclick="openRename('${item.id}')"><i class="fas fa-edit"></i> Rename</div><div style="border-top:1px solid #333; margin:5px 0"></div><div class="ctx-item" onclick="deleteItems(['${item.id}'])" style="color:#ff4444"><i class="fas fa-trash"></i> Delete</div>`;
+        const isLink = item.type === 'link';
+        const renameLabel = isLink ? 'Edit' : 'Rename';
+        const renameIcon = isLink ? 'fa-edit' : 'fa-edit';
+        const renameAction = isLink ? `openEditor('note', 'link', rawData.find(i => i.id === '${item.id}'))` : `openRename('${item.id}')`;
+
+        menu.innerHTML = `<div class="ctx-item" onclick="copyItems()"><i class="fas fa-copy"></i> Copy</div><div class="ctx-item" onclick="cutItems()"><i class="fas fa-cut"></i> Cut</div><div class="ctx-item" onclick="${renameAction}"><i class="fas ${renameIcon}"></i> ${renameLabel}</div><div style="border-top:1px solid #333; margin:5px 0"></div><div class="ctx-item" onclick="deleteItems(['${item.id}'])" style="color:#ff4444"><i class="fas fa-trash"></i> Delete</div>`;
         displayMenu(e, menu);
     }
 
@@ -189,7 +206,8 @@
         if (zone === 'note') {
             menu.innerHTML = `
                 <div class="ctx-item" onclick="openEditor('note', 'item')"><i class="fas fa-file-medical"></i> New Note</div>
-                <div class="ctx-item" onclick="openEditor('note', 'folder')"><i class="fas fa-folder-plus"></i> New Folder</div>`;
+                <div class="ctx-item" onclick="openEditor('note', 'folder')"><i class="fas fa-folder-plus"></i> New Folder</div>
+                <div class="ctx-item" onclick="openEditor('note', 'link')"><i class="fas fa-link"></i> New Link</div>`;
         } else {
             menu.innerHTML = `<div class="ctx-item" onclick="openEditor('task', 'item')"><i class="fas fa-plus"></i> New Task</div>`;
         }
@@ -275,11 +293,29 @@
     }
 
     function openEditor(cat, type, item = null) {
+        hideContextMenu();
         state.activeItem = item; state.activeCategory = cat; state.activeType = type;
         state.modalAction = 'save';
         const isTask = cat === 'task';
         const isFolder = type === 'folder';
-        showModal(`<input type="text" id="m-title" class="modal-input" placeholder="${isFolder ? 'Folder Name' : 'Title'}" value="${item ? item.title : ''}" style="${isTask ? 'display:none' : 'display:block'}"><textarea id="m-content" class="modal-textarea" placeholder="${isTask ? 'Task details...' : 'Start typing...'}" id="m-content" style="${isFolder ? 'display:none' : 'display:block'}">${item ? item.content : ''}</textarea><div class="modal-footer"><button class="btn btn-s" onclick="closeModal()">Cancel</button><button class="btn btn-p" id="confirm-btn" onclick="saveData()">Save (Enter)</button></div>`);
+        const isLink = type === 'link';
+        
+        let titlePlaceholder = "Title";
+        let contentPlaceholder = "Start typing...";
+        let contentStyle = "display:block";
+
+        if(isFolder) { titlePlaceholder = "Folder Name"; contentStyle = "display:none"; }
+        if(isLink) { titlePlaceholder = "Link Name"; contentPlaceholder = "URL (e.g. google.com)"; }
+        if(isTask) { contentPlaceholder = "Task details..."; titlePlaceholder = ""; }
+
+        showModal(`
+            <input type="text" id="m-title" class="modal-input" placeholder="${titlePlaceholder}" value="${item ? item.title : ''}" style="${isTask ? 'display:none' : 'display:block'}">
+            <textarea id="m-content" class="modal-textarea" placeholder="${contentPlaceholder}" id="m-content" style="${contentStyle}">${item ? item.content : ''}</textarea>
+            <div class="modal-footer">
+                <button class="btn btn-s" onclick="closeModal()">Cancel</button>
+                <button class="btn btn-p" id="confirm-btn" onclick="saveData()">Save (Enter)</button>
+            </div>
+        `);
         setTimeout(() => {
             const el = document.getElementById(isTask ? 'm-content' : 'm-title');
             if(el) el.focus();
@@ -314,7 +350,6 @@
                     event.preventDefault(); saveData();
                 } else if (state.modalAction === 'rename') {
                     event.preventDefault();
-                    const input = document.getElementById('rename-input');
                     const id = state.selectedIds[0];
                     if(id) doRename(id);
                 } else if (state.modalAction === 'delete') {
@@ -330,7 +365,11 @@
         if (event.ctrlKey && event.key === 'x') cutItems();
         if (event.ctrlKey && event.key === 'v') pasteItems();
         if (event.key === 'Delete' && state.selectedIds.length > 0) deleteItems(state.selectedIds);
-        if (event.key === 'F2' && state.selectedIds.length === 1) openRename(state.selectedIds[0]);
+        if (event.key === 'F2' && state.selectedIds.length === 1) {
+            const item = rawData.find(i => i.id === state.selectedIds[0]);
+            if(item && item.type === 'link') openEditor('note', 'link', item);
+            else if(item) openRename(item.id);
+        }
     }
 
     function copyItems() { state.clipboard = { ids: [...state.selectedIds], mode: 'copy' }; hideContextMenu(); showProgress("Copied", "success"); }
@@ -350,7 +389,7 @@
         render();
     }
 
-    function editNote(item) { openEditor('note', 'item', item); }
+    function editNote(item) { openEditor('note', item.type, item); }
     function editTask(id) { openEditor('task', 'item', rawData.find(i => i.id === id)); }
     function enterFolder(item) { state.currentPid = item.id; state.path.push(item); state.selectedIds = []; render(); }
     function goRoot() { state.currentPid = null; state.path = []; render(); }
