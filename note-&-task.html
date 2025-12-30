@@ -1,0 +1,362 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Note & Task</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        :root {
+            --bg: #0b0b0b; --side: #141414; --accent: #0078d4;
+            --brd: #222; --txt: #aaa; --bright: #eee; --danger: #d83b01; --sel: rgba(0, 120, 212, 0.2);
+            --ctx-bg: #1c1c1c;
+        }
+        body { margin: 0; font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--txt); height: 100vh; overflow: hidden; display: flex; flex-direction: column; }
+        
+        .main-content { display: grid; grid-template-columns: 2fr 1fr; gap: 20px; padding: 15px; flex: 1; height: 100%; box-sizing: border-box; overflow: hidden; }
+        @media (max-width: 768px) { .main-content { grid-template-columns: 1fr; overflow-y: auto; } .panel { min-height: 400px; } }
+
+        .panel { background: var(--side); border: 1px solid var(--brd); border-radius: 16px; display: flex; flex-direction: column; overflow: hidden; position: relative; }
+        .panel-h { padding: 15px 20px; border-bottom: 1px solid var(--brd); display: flex; justify-content: space-between; align-items: center; background: rgba(255,255,255,0.02); }
+        .panel-h h2 { margin: 0; font-size: 16px; color: var(--bright); display: flex; align-items: center; gap: 10px; text-transform: uppercase; font-weight: 700; }
+        
+        .list-area { flex: 1; overflow-y: auto; padding: 10px; display: flex; flex-direction: column; gap: 4px; outline: none; min-height: 100px; }
+
+        .item-note { 
+            background: transparent; border: 1px solid transparent; padding: 12px 18px; border-radius: 12px; cursor: pointer; 
+            display: flex; justify-content: space-between; align-items: center; user-select: none; transition: 0.1s;
+        }
+        .item-note:hover { background: rgba(255,255,255,0.05); }
+        .item-note.selected { background: var(--sel); border-color: var(--accent); }
+        
+        .note-t { font-size: 16px; color: var(--bright); display: flex; align-items: center; gap: 15px; flex: 1; pointer-events: none; }
+        .note-t i { font-size: 20px; }
+        
+        .item-task { background: #1c1c1c; border: 1px solid var(--brd); padding: 15px 18px; border-radius: 12px; display: flex; align-items: flex-start; gap: 15px; transition: 0.2s; }
+        .check-btn { width: 22px; height: 22px; border-radius: 6px; border: 2px solid var(--accent); cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+        .check-btn.done { background: var(--accent); }
+        .check-btn i { font-size: 11px; color: #fff; display: none; }
+        .check-btn.done i { display: block; }
+        .task-content { flex: 1; font-size: 15px; color: #fff; line-height: 1.4; white-space: pre-wrap; cursor: pointer; }
+        .task-content.done { opacity: 0.3; text-decoration: line-through; }
+
+        .btn-add { width: 34px; height: 34px; border-radius: 10px; border: none; background: #2a2a2a; color: #fff; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: 0.2s; }
+        .btn-add:hover { background: var(--accent); }
+
+        .breadcrumb { font-size: 12px; padding: 10px 20px; background: rgba(0,0,0,0.2); display: flex; align-items: center; gap: 5px; color: #555; border-bottom: 1px solid var(--brd); }
+        .breadcrumb span { cursor: pointer; }
+
+        .modal-bg { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); display: none; align-items: flex-end; justify-content: center; z-index: 1000; opacity: 0; transition: opacity 0.3s ease; }
+        .modal-bg.active { opacity: 1; display: flex; }
+        .modal { 
+            background: #1c1c1c; width: 100%; max-width: 600px; border-radius: 24px 24px 0 0; 
+            transform: translateY(100%); transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            max-height: 90vh; display: flex; flex-direction: column; padding: 20px;
+        }
+        .modal-bg.active .modal { transform: translateY(0); }
+        .modal-header { display: flex; justify-content: center; padding-bottom: 20px; }
+        .drag-handle { width: 40px; height: 5px; background: #444; border-radius: 10px; }
+        .modal-input { width: 100%; background: transparent; border: none; color: #fff; outline: none; font-size: 20px; font-weight: bold; margin-bottom: 15px; }
+        .modal-textarea { width: 100%; background: transparent; border: none; color: #ccc; outline: none; font-size: 16px; min-height: 200px; resize: none; line-height: 1.6; }
+        .modal-footer { padding-top: 20px; display: flex; gap: 10px; }
+
+        .status-modal-bg { position: fixed; bottom: 0; left: 0; width: 100%; display: flex; justify-content: center; padding: 20px; z-index: 3000; pointer-events: none; }
+        .status-modal { 
+            background: #252525; color: #fff; padding: 12px 24px; border-radius: 16px; border: 1px solid var(--brd);
+            display: flex; align-items: center; gap: 12px; font-size: 14px; font-weight: 600;
+            transform: translateY(150%); transition: transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+        }
+        .status-modal.active { transform: translateY(0); }
+
+        .custom-context-menu {
+            position: fixed; z-index: 2000; background: var(--ctx-bg); border: 1px solid var(--brd); border-radius: 10px; 
+            padding: 5px; min-width: 180px; box-shadow: 0 10px 25px rgba(0,0,0,0.5); display: none;
+        }
+        .ctx-item { display: flex; align-items: center; gap: 12px; padding: 10px 15px; border-radius: 6px; cursor: pointer; color: #eee; font-size: 13px; transition: 0.1s; }
+        .ctx-item:hover { background: var(--accent); color: #fff; }
+
+        .btn { flex: 1; padding: 15px; border-radius: 14px; border: none; font-weight: 600; cursor: pointer; font-size: 15px; outline: none; }
+        .btn:focus { ring: 2px solid #fff; opacity: 0.8; }
+        .btn-p { background: var(--accent); color: #fff; }
+        .btn-s { background: #2a2a2a; color: #fff; }
+        .btn-d { background: var(--danger); color: #fff; }
+    </style>
+</head>
+<body onkeydown="handleGlobalKeys(event)" onclick="hideContextMenu()">
+
+<div class="main-content">
+    <div class="panel">
+        <div class="panel-h">
+            <h2><i class="fas fa-folder-open"></i> Notes</h2>
+            <div style="display: flex; gap: 8px;">
+                <button class="btn-add" onclick="openEditor('note', 'folder')"><i class="fas fa-folder-plus"></i></button>
+                <button class="btn-add" onclick="openEditor('note', 'item')"><i class="fas fa-plus"></i></button>
+            </div>
+        </div>
+        <div id="note-path" class="breadcrumb"></div>
+        <div id="note-list" class="list-area" tabindex="0" oncontextmenu="showEmptyContextMenu(event, 'note')"></div>
+    </div>
+
+    <div class="panel">
+        <div class="panel-h">
+            <h2><i class="fas fa-tasks"></i> Tasks</h2>
+            <button class="btn-add" onclick="openEditor('task', 'item')"><i class="fas fa-plus"></i></button>
+        </div>
+        <div id="task-list" class="list-area" oncontextmenu="showEmptyContextMenu(event, 'task')"></div>
+    </div>
+</div>
+
+<div id="modal-container" class="modal-bg" onclick="if(event.target === this) closeModal()">
+    <div id="modal-content" class="modal">
+        <div class="modal-header"><div class="drag-handle"></div></div>
+        <div id="modal-body"></div>
+    </div>
+</div>
+
+<div class="status-modal-bg">
+    <div id="status-modal" class="status-modal">
+        <i id="status-icon" class="fas fa-circle-notch fa-spin"></i>
+        <span id="status-text">Processing...</span>
+    </div>
+</div>
+
+<div id="ctx-menu" class="custom-context-menu"></div>
+
+<script>
+    const SUPABASE_URL = 'https://nynowiamkpddohtaoqvt.supabase.co';
+    const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im55bm93aWFta3BkZG9odGFvcXZ0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjY2MzQyODEsImV4cCI6MjA4MjIxMDI4MX0.vN7m2SUztxtHUROEMOqtbqMGRPehM9UJZP_VSsVMRtw';
+    const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+    const TBL = 'personal_hub';
+
+    let rawData = [];
+    let state = { currentPid: null, path: [], selectedIds: [], clipboard: { ids: [], mode: null }, activeItem: null, activeCategory: null, activeType: null, modalAction: null };
+
+    async function showProgress(text, type = 'process') {
+        const modal = document.getElementById('status-modal');
+        const icon = document.getElementById('status-icon');
+        const label = document.getElementById('status-text');
+        label.innerText = text;
+        icon.className = type === 'process' ? 'fas fa-circle-notch fa-spin' : 'fas fa-check-circle';
+        icon.style.color = type === 'process' ? 'var(--accent)' : '#4caf50';
+        modal.classList.add('active');
+        if(type === 'success') setTimeout(() => modal.classList.remove('active'), 2000);
+    }
+
+    async function syncAndRender() {
+        const { data, error } = await sb.from(TBL).select('*').eq('store', 'main').order('type', {ascending: false});
+        if (!error) { rawData = data; render(); }
+    }
+
+    function render() {
+        const taskList = document.getElementById('task-list');
+        const noteList = document.getElementById('note-list');
+        taskList.innerHTML = ''; noteList.innerHTML = '';
+        updateBreadcrumb();
+        rawData.forEach(item => {
+            if (item.category === 'task') {
+                const div = document.createElement('div');
+                div.className = 'item-task';
+                div.innerHTML = `<div class="check-btn ${item.is_completed ? 'done' : ''}" onclick="toggleTask('${item.id}', ${item.is_completed})"><i class="fas fa-check"></i></div><div class="task-content ${item.is_completed ? 'done' : ''}" onclick="editTask('${item.id}')">${item.content}</div>`;
+                div.oncontextmenu = (e) => { e.stopPropagation(); showContextMenu(e, item); };
+                taskList.appendChild(div);
+            } else if (item.pid === state.currentPid) {
+                const div = document.createElement('div');
+                div.className = `item-note ${state.selectedIds.includes(item.id) ? 'selected' : ''}`;
+                const isFolder = item.type === 'folder';
+                div.onclick = (e) => { e.stopPropagation(); handleSelection(e, item); };
+                div.ondblclick = () => isFolder ? enterFolder(item) : editNote(item);
+                div.oncontextmenu = (e) => { e.stopPropagation(); showContextMenu(e, item); };
+                div.innerHTML = `<span class="note-t"><i class="fas ${isFolder ? 'fa-folder' : 'fa-file-lines'}" style="color:${isFolder ? '#ffca28' : 'var(--accent)'}"></i> ${item.title}</span>`;
+                noteList.appendChild(div);
+            }
+        });
+    }
+
+    function showContextMenu(e, item) {
+        e.preventDefault();
+        state.selectedIds = [item.id];
+        render();
+        const menu = document.getElementById('ctx-menu');
+        menu.innerHTML = `<div class="ctx-item" onclick="copyItems()"><i class="fas fa-copy"></i> Copy</div><div class="ctx-item" onclick="cutItems()"><i class="fas fa-cut"></i> Cut</div><div class="ctx-item" onclick="openRename('${item.id}')"><i class="fas fa-edit"></i> Rename</div><div style="border-top:1px solid #333; margin:5px 0"></div><div class="ctx-item" onclick="deleteItems(['${item.id}'])" style="color:#ff4444"><i class="fas fa-trash"></i> Delete</div>`;
+        displayMenu(e, menu);
+    }
+
+    function showEmptyContextMenu(e, zone) {
+        e.preventDefault();
+        const menu = document.getElementById('ctx-menu');
+        if (zone === 'note') {
+            menu.innerHTML = `
+                <div class="ctx-item" onclick="openEditor('note', 'item')"><i class="fas fa-file-medical"></i> New Note</div>
+                <div class="ctx-item" onclick="openEditor('note', 'folder')"><i class="fas fa-folder-plus"></i> New Folder</div>`;
+        } else {
+            menu.innerHTML = `<div class="ctx-item" onclick="openEditor('task', 'item')"><i class="fas fa-plus"></i> New Task</div>`;
+        }
+        if (state.clipboard.ids.length > 0) {
+            menu.innerHTML += `<div style="border-top:1px solid #333; margin:5px 0"></div><div class="ctx-item" onclick="pasteItems()"><i class="fas fa-paste"></i> Paste</div>`;
+        }
+        displayMenu(e, menu);
+    }
+
+    function displayMenu(e, menu) {
+        menu.style.display = 'block';
+        let x = e.clientX, y = e.clientY;
+        if (x + menu.offsetWidth > window.innerWidth) x -= menu.offsetWidth;
+        if (y + menu.offsetHeight > window.innerHeight) y -= menu.offsetHeight;
+        menu.style.left = x + 'px'; menu.style.top = y + 'px';
+    }
+
+    function hideContextMenu() { document.getElementById('ctx-menu').style.display = 'none'; }
+
+    function showModal(html) {
+        document.getElementById('modal-body').innerHTML = html;
+        const bg = document.getElementById('modal-container');
+        bg.style.display = 'flex';
+        setTimeout(() => bg.classList.add('active'), 10);
+    }
+
+    function closeModal() {
+        const bg = document.getElementById('modal-container');
+        if(!bg) return;
+        bg.classList.remove('active');
+        state.modalAction = null;
+        setTimeout(() => bg.style.display = 'none', 300);
+    }
+
+    async function saveData() {
+        const title = document.getElementById('m-title')?.value.trim();
+        const content = document.getElementById('m-content')?.value.trim();
+        if(!content && !title) return;
+        showProgress("Saving...");
+        const payload = { title: state.activeCategory === 'task' ? content.substring(0, 50) : title, content, category: state.activeCategory, type: state.activeType, pid: state.currentPid, store: 'main' };
+        if(state.activeItem) await sb.from(TBL).update({ title: payload.title, content }).eq('id', state.activeItem.id);
+        else await sb.from(TBL).insert([payload]);
+        closeModal(); await syncAndRender(); showProgress("Saved", "success");
+    }
+
+    async function doRename(id) {
+        const newTitle = document.getElementById('rename-input').value.trim();
+        if(!newTitle) return;
+        showProgress("Renaming...");
+        await sb.from(TBL).update({ title: newTitle }).eq('id', id);
+        closeModal(); await syncAndRender(); showProgress("Renamed", "success");
+    }
+
+    async function confirmDelete(ids) {
+        showProgress("Deleting...");
+        await sb.from(TBL).delete().in('id', ids);
+        state.selectedIds = []; closeModal(); await syncAndRender(); showProgress("Deleted", "success");
+    }
+
+    async function toggleTask(id, s) { 
+        showProgress(s ? "Unmarking..." : "Marking Done...");
+        await sb.from(TBL).update({ is_completed: !s }).eq('id', id); 
+        await syncAndRender(); showProgress(s ? "Unmarked" : "Done", "success");
+    }
+
+    async function pasteItems() {
+        if(!state.clipboard.ids.length) return;
+        showProgress("Pasting...");
+        for (const id of state.clipboard.ids) {
+            if (state.clipboard.mode === 'cut') {
+                await sb.from(TBL).update({ pid: state.currentPid }).eq('id', id);
+            } else {
+                const item = rawData.find(i => i.id === id);
+                if(item) {
+                    const { id: oldId, created_at, ...cleanData } = item;
+                    cleanData.pid = state.currentPid; cleanData.title += " - Copy";
+                    await sb.from(TBL).insert([cleanData]);
+                }
+            }
+        }
+        state.clipboard = { ids: [], mode: null };
+        await syncAndRender(); showProgress("Pasted", "success");
+    }
+
+    function openEditor(cat, type, item = null) {
+        state.activeItem = item; state.activeCategory = cat; state.activeType = type;
+        state.modalAction = 'save';
+        const isTask = cat === 'task';
+        const isFolder = type === 'folder';
+        showModal(`<input type="text" id="m-title" class="modal-input" placeholder="${isFolder ? 'Folder Name' : 'Title'}" value="${item ? item.title : ''}" style="${isTask ? 'display:none' : 'display:block'}"><textarea id="m-content" class="modal-textarea" placeholder="${isTask ? 'Task details...' : 'Start typing...'}" id="m-content" style="${isFolder ? 'display:none' : 'display:block'}">${item ? item.content : ''}</textarea><div class="modal-footer"><button class="btn btn-s" onclick="closeModal()">Cancel</button><button class="btn btn-p" id="confirm-btn" onclick="saveData()">Save (Enter)</button></div>`);
+        setTimeout(() => {
+            const el = document.getElementById(isTask ? 'm-content' : 'm-title');
+            if(el) el.focus();
+        }, 100);
+    }
+
+    function openRename(id) {
+        hideContextMenu();
+        state.modalAction = 'rename';
+        const item = rawData.find(i => i.id === id);
+        showModal(`<div style="font-weight: bold; margin-bottom: 15px; color: #fff; font-size:18px">Rename</div><input type="text" id="rename-input" class="modal-input" value="${item.title}"><div class="modal-footer"><button class="btn btn-s" onclick="closeModal()">Cancel</button><button class="btn btn-p" id="confirm-btn" onclick="doRename('${id}')">Apply (Enter)</button></div>`);
+        setTimeout(() => {
+            const el = document.getElementById('rename-input');
+            if(el) { el.focus(); el.select(); }
+        }, 100);
+    }
+
+    function deleteItems(ids) { 
+        hideContextMenu(); 
+        state.modalAction = 'delete';
+        state.pendingDeleteIds = ids;
+        showModal(`<div style="text-align:center; padding: 20px 0;"><i class="fas fa-trash-alt" style="font-size: 40px; color: var(--danger); margin-bottom: 15px;"></i><div style="font-size: 18px; color:#fff; font-weight:bold;">Delete ${ids.length} item(s)?</div></div><div class="modal-footer"><button class="btn btn-s" onclick="closeModal()">Cancel</button><button class="btn btn-d" id="confirm-btn" onclick="confirmDelete(['${ids.join("','")}'])">Delete (Enter)</button></div>`);
+        setTimeout(() => document.getElementById('confirm-btn').focus(), 100);
+    }
+
+    function handleGlobalKeys(event) {
+        const isModalOpen = document.querySelector('.modal-bg.active');
+        if (isModalOpen) {
+            if (event.key === 'Enter') {
+                if (state.modalAction === 'save') {
+                    if (event.target.tagName === 'TEXTAREA' && event.shiftKey) return; 
+                    event.preventDefault(); saveData();
+                } else if (state.modalAction === 'rename') {
+                    event.preventDefault();
+                    const input = document.getElementById('rename-input');
+                    const id = state.selectedIds[0];
+                    if(id) doRename(id);
+                } else if (state.modalAction === 'delete') {
+                    event.preventDefault();
+                    confirmDelete(state.pendingDeleteIds);
+                }
+            }
+            if (event.key === 'Escape') { event.preventDefault(); closeModal(); }
+            return;
+        }
+
+        if (event.ctrlKey && event.key === 'c') copyItems();
+        if (event.ctrlKey && event.key === 'x') cutItems();
+        if (event.ctrlKey && event.key === 'v') pasteItems();
+        if (event.key === 'Delete' && state.selectedIds.length > 0) deleteItems(state.selectedIds);
+        if (event.key === 'F2' && state.selectedIds.length === 1) openRename(state.selectedIds[0]);
+    }
+
+    function copyItems() { state.clipboard = { ids: [...state.selectedIds], mode: 'copy' }; hideContextMenu(); showProgress("Copied", "success"); }
+    function cutItems() { state.clipboard = { ids: [...state.selectedIds], mode: 'cut' }; hideContextMenu(); showProgress("Cut", "success"); }
+
+    function updateBreadcrumb() {
+        const nav = document.getElementById('note-path');
+        nav.innerHTML = `<span onclick="goRoot()">Root</span>`;
+        state.path.forEach((p, i) => { nav.innerHTML += ` <i class="fas fa-chevron-right" style="opacity:0.2; font-size:10px; margin:0 5px;"></i> <span onclick="goBackTo(${i})">${p.title}</span>`; });
+    }
+
+    function handleSelection(e, item) {
+        if (e.ctrlKey) {
+            if (state.selectedIds.includes(item.id)) state.selectedIds = state.selectedIds.filter(id => id !== item.id);
+            else state.selectedIds.push(item.id);
+        } else { state.selectedIds = [item.id]; }
+        render();
+    }
+
+    function editNote(item) { openEditor('note', 'item', item); }
+    function editTask(id) { openEditor('task', 'item', rawData.find(i => i.id === id)); }
+    function enterFolder(item) { state.currentPid = item.id; state.path.push(item); state.selectedIds = []; render(); }
+    function goRoot() { state.currentPid = null; state.path = []; render(); }
+    function goBackTo(i) { state.path = state.path.slice(0, i+1); state.currentPid = state.path[i].id; render(); }
+
+    syncAndRender();
+</script>
+</body>
+</html>
