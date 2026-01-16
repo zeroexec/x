@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Neural Core | Tactical CLI Interface</title>
+    
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
+
+    <style>
+        :root { 
+            --accent: #00e5ff; 
+            --accent-glow: rgba(0, 229, 255, 0.7);
+            --bg-deep: #000000;
+            --code-font: 'JetBrains Mono', 'Fira Code', monospace;
+        }
+
+        body, html { 
+            margin: 0; padding: 0; width: 100%; height: 100%; 
+            background: var(--bg-deep); color: #444;
+            font-family: var(--code-font);
+            display: flex; overflow: hidden;
+        }
+
+        .scan-grid {
+            position: absolute; inset: 0;
+            background: 
+                radial-gradient(circle at center, rgba(0, 229, 255, 0.1) 0%, transparent 75%),
+                linear-gradient(rgba(0, 229, 255, 0.02) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(0, 229, 255, 0.02) 1px, transparent 1px);
+            background-size: 100% 100%, 50px 50px, 50px 50px;
+            z-index: 1;
+        }
+
+        /* --- CENTRAL LOGO (STABLE) --- */
+        .main-hub {
+            position: absolute; inset: 0;
+            display: flex; justify-content: center; align-items: center;
+            z-index: 50; pointer-events: none;
+        }
+
+        .targeting-system {
+            position: relative; width: 550px; height: 550px;
+            display: flex; justify-content: center; align-items: center;
+        }
+
+        .hud-ring {
+            position: absolute; border-radius: 50%;
+            border: 1px solid var(--accent); opacity: 0.2;
+        }
+        .r1 { width: 100%; height: 100%; border-style: dashed; animation: rot-cw 40s linear infinite; }
+        .r2 { width: 85%; height: 85%; border: 4px double var(--accent); border-left-color: transparent; border-right-color: transparent; animation: rot-ccw 15s linear infinite; opacity: 0.4; }
+
+        .logo-core {
+            width: 320px; height: 320px; background: #000;
+            border: 12px double var(--accent); border-radius: 50%;
+            display: flex; justify-content: center; align-items: center;
+            box-shadow: 0 0 100px var(--accent-glow), inset 0 0 40px var(--accent-glow);
+            z-index: 60;
+        }
+        #displayLogo { width: 65%; height: 65%; filter: drop-shadow(0 0 20px var(--accent)); }
+
+        @keyframes rot-cw { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+        @keyframes rot-ccw { from { transform: rotate(360deg); } to { transform: rotate(0deg); } }
+
+        /* --- CHAT SECTOR (CLI INPUT STYLE) --- */
+        #left-chat-sector { 
+            width: 350px; height: 100%; z-index: 100; 
+            border-right: 1px solid rgba(0,229,255,0.1);
+            display: flex; flex-direction: column;
+        }
+        
+        #chat-box { 
+            flex: 1; padding: 50px 25px 20px 25px; 
+            display: flex; flex-direction: column; gap: 15px; 
+            overflow-y: auto; scrollbar-width: none;
+        }
+
+        .log-entry { font-size: 11px; line-height: 1.4; animation: fadeInChat 0.3s ease-out; }
+        .tag { color: var(--accent); font-weight: bold; margin-right: 8px; }
+        .txt { color: #e0e0e0; }
+
+        .chat-input-wrapper { 
+            padding: 30px 25px 60px 25px;
+            display: flex; align-items: center; gap: 10px;
+        }
+        .cli-prompt { color: var(--accent); font-weight: bold; font-size: 14px; }
+        #message-input { 
+            flex: 1; background: transparent; border: none; 
+            color: var(--accent); font-family: var(--code-font);
+            font-size: 13px; outline: none;
+            border-bottom: 1px solid rgba(0, 229, 255, 0.3);
+            padding-bottom: 4px;
+        }
+
+        /* --- WATERFALL TERMINAL (RIGHT) --- */
+        #right-terminal-sector {
+            flex: 1; height: 100%; z-index: 100;
+            display: flex; flex-direction: column; justify-content: flex-end;
+            padding-bottom: 140px; padding-right: 40px; pointer-events: none;
+        }
+
+        #cmd-log {
+            display: flex; flex-direction: column; justify-content: flex-end;
+            gap: 4px; max-height: 70vh; overflow: hidden; margin-bottom: 25px;
+        }
+
+        .run-line { 
+            font-size: 10px; text-align: right; color: #fff; opacity: 0.6;
+            white-space: nowrap;
+            animation: slideInRight 0.25s cubic-bezier(0.25, 0.46, 0.45, 0.94) both;
+        }
+
+        @keyframes slideInRight {
+            0% { transform: translateX(60px); opacity: 0; }
+            100% { transform: translateX(0); opacity: 0.6; }
+        }
+
+        .typer-container { width: 100%; display: flex; justify-content: flex-end; }
+        .prompt-line { 
+            font-size: 13px; color: var(--accent); background: rgba(0, 229, 255, 0.1);
+            padding: 8px 16px; border-radius: 3px;
+            display: flex; align-items: center; flex-direction: row-reverse;
+        }
+
+        .cursor { width: 6px; height: 15px; background: var(--accent); animation: blink 0.5s infinite; margin-left: 10px; }
+        @keyframes blink { 50% { opacity: 0; } }
+
+    </style>
+</head>
+<body>
+
+    <div class="scan-grid"></div>
+
+    <div class="main-hub">
+        <div class="targeting-system">
+            <div class="hud-ring r1"></div>
+            <div class="hud-ring r2"></div>
+            <div class="logo-core">
+                <img id="displayLogo" src="https://via.placeholder.com/300/00e5ff/000000?text=CORE" alt="CORE">
+            </div>
+        </div>
+    </div>
+
+    <aside id="left-chat-sector">
+        <div id="chat-box"></div>
+        <div class="chat-input-wrapper">
+            <span class="cli-prompt">>_</span>
+            <input type="text" id="message-input" placeholder="Enter command..." autocomplete="off">
+        </div>
+    </aside>
+
+    <main id="right-terminal-sector">
+        <div id="cmd-log"></div>
+        <div class="typer-container">
+            <div class="prompt-line">
+                <span class="cursor"></span><span id="typing-area"></span><span style="margin-left: 10px; opacity: 0.5;">:ROOT@CORE_CMD</span>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        const cmdLog = document.getElementById('cmd-log');
+        const typingArea = document.getElementById('typing-area');
+
+        function addLog(text, color = '#fff') {
+            const div = document.createElement('div');
+            div.className = 'run-line';
+            div.style.color = color;
+            div.textContent = text + " [OK]";
+            cmdLog.appendChild(div);
+            if(cmdLog.childNodes.length > 30) cmdLog.removeChild(cmdLog.firstChild);
+        }
+
+        // --- EXTENDED INITIAL BOOT ---
+        async function runHeavyBoot() {
+            const longBoot = [
+                "0x001: KERNEL_LOAD_INIT_SEQUENCE", "0x002: MOUNTING_VIRTUAL_FILESYSTEM",
+                "0x003: ESTABLISHING_ENCRYPTED_TUNNEL", "0x004: NEURAL_DRIVE_CHECKING... 100%",
+                "0x005: SYNCING_CLUSTER_01_TO_SUPABASE", "0x006: FIREWALL_RULES_APPLIED",
+                "0x007: LOADING_IO_DRIVERS...", "0x008: DETECTING_ACTIVE_NODES...",
+                "NODE_X1: ONLINE", "NODE_X2: ONLINE", "NODE_X3: STANDBY",
+                "----------------------------------------",
+                "SUDO NMAP -sV -T4 SCAN_INTERNAL_NET", "PORT_80: HTTP_NODE_JS",
+                "PORT_443: SSL_OPEN_SSH_7.4", "PORT_5432: POSTGRESQL_DB",
+                "PORT_6379: REDIS_CACHE_ACTIVE", "----------------------------------------",
+                "Bypassing AES-Handshake...", "Handshake Verified.", "Accessing HyperCore...",
+                "SYSTEM_READY: TRUE", "AWAITING_USER_INPUT..."
+            ];
+
+            for(let code of longBoot) {
+                addLog(code, code.includes("ONLINE") || code.includes("Verified") ? 'var(--accent)' : '#fff');
+                await new Promise(r => setTimeout(r, 50)); // Fast burst
+            }
+            startNormalLoop();
+        }
+
+        const scripts = [
+            { cmd: "apt-get upgrade core-sys", run: ["Reading package lists...", "Building dependency tree...", "Done."] },
+            { cmd: "docker ps -a", run: ["CONTAINER ID: 9f21b", "IMAGE: neural_v2", "STATUS: Up 12m"] },
+            { cmd: "git push origin master", run: ["Counting objects: 4", "Writing objects: 100%", "Remote: OK"] },
+            { cmd: "python3 decrypt.py --key=secret", run: ["Brute forcing...", "Key found: 'admin_pass'"] }
+        ];
+
+        let sIdx = 0, cIdx = 0;
+        function startNormalLoop() {
+            let s = scripts[sIdx];
+            if (cIdx < s.cmd.length) {
+                typingArea.textContent += s.cmd.charAt(cIdx);
+                cIdx++;
+                setTimeout(startNormalLoop, 45);
+            } else {
+                setTimeout(() => {
+                    addLog(">> " + s.cmd, 'var(--accent)');
+                    s.run.forEach((t, i) => setTimeout(() => addLog(t), i * 120));
+                    typingArea.textContent = "";
+                    cIdx = 0;
+                    sIdx = (sIdx + 1) % scripts.length;
+                    setTimeout(startNormalLoop, 3000);
+                }, 1000);
+            }
+        }
+
+        runHeavyBoot();
+
+        // --- FIREBASE SYNC ---
+        const fbConf = {
+            apiKey: "AIzaSyDXt7Jh0W-d5blhNoi3ocRdw4OyAY7fd3c",
+            authDomain: "pesan-30bab.firebaseapp.com",
+            databaseURL: "https://pesan-30bab-default-rtdb.firebaseio.com",
+            projectId: "pesan-30bab",
+            storageBucket: "pesan-30bab.appspot.com",
+            messagingSenderId: "973488115942",
+            appId: "1:973488115942:web:0a8383a7a7b03aa9ba6b27"
+        };
+        firebase.initializeApp(fbConf);
+        const db = firebase.database();
+
+        document.getElementById("message-input").addEventListener("keypress", (e) => {
+            if (e.key === "Enter") {
+                const val = e.target.value.trim();
+                if(val) {
+                    db.ref("pesan").push({ nama: "Virgo", teks: val, waktu: Date.now() });
+                    e.target.value = "";
+                }
+            }
+        });
+
+        db.ref("pesan").limitToLast(20).on("child_added", (s) => {
+            const d = s.val();
+            const div = document.createElement("div");
+            div.className = "log-entry";
+            div.innerHTML = `<span class="tag">[${d.nama.toUpperCase()}]</span> <span class="txt">${d.teks}</span>`;
+            const box = document.getElementById("chat-box");
+            box.appendChild(div);
+            box.scrollTop = box.scrollHeight;
+        });
+
+        const sp = supabase.createClient('https://nynowiamkpddohtaoqvt.supabase.co', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im55bm93aWFta3BkZG9odGFvcXZ0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjY2MzQyODEsImV4cCI6MjA4MjIxMDI4MX0.vN7m2SUztxtHUROEMOqtbqMGRPehM9UJZP_VSsVMRtw');
+        async function getL() {
+            const { data } = await sp.from('settings').select('site_favicon').eq('id', 1).maybeSingle();
+            if (data?.site_favicon) document.getElementById('displayLogo').src = data.site_favicon;
+        }
+        getL();
+    </script>
+</body>
+</html>
