@@ -566,28 +566,44 @@
     }
 
     async function freezeItem(id) {
-        hideCtx();
-        const node = state.allNodes.find(n => n.id === id);
-        if(!node) return;
+    hideCtx();
+    const node = state.allNodes.find(n => n.id === id);
+    if(!node) return;
 
-        // UI Optimistic Remove
-        const oldNodes = [...state.allNodes];
-        state.allNodes = state.allNodes.filter(n => n.id !== id);
+    // UI Optimistic Remove (Agar terlihat cepat)
+    const oldNodes = [...state.allNodes];
+    state.allNodes = state.allNodes.filter(n => n.id !== id);
+    render();
+
+    // PERBAIKAN DI SINI:
+    // Kita buat objek baru yang bersih, jangan kirim mentah-mentah "...node"
+    // karena bisa jadi ada properti internal yang bikin error.
+    const cleanNode = {
+        name: node.name,
+        type: node.type,
+        content: node.content || '', // Pastikan tidak null/undefined
+        pid: node.pid,
+        store: 'frozen'
+        // Kita biarkan Supabase membuat ID baru untuk item yang dibekukan
+        // atau jika ingin ID sama, tambahkan: id: node.id
+    };
+
+    // Kirim ke tabel freeze_storage
+    const { error: insErr } = await sb.from('freeze_storage').insert([cleanNode]);
+    
+    if(!insErr) {
+        // Hapus dari tabel utama (fs_nodes)
+        await sb.from('fs_nodes').delete().eq('id', id);
+        showToast("Item frozen successfully");
+        await syncData(); // Pastikan sinkronisasi ulang
+    } else {
+        // Jika gagal, kembalikan tampilan seperti semula
+        console.error(insErr); // Cek console untuk detail error
+        state.allNodes = oldNodes;
         render();
-
-        // Transaction-like operations
-        const { error: insErr } = await sb.from('freeze_storage').insert([{ ...node, store: 'frozen' }]);
-        
-        if(!insErr) {
-            await sb.from('fs_nodes').delete().eq('id', id);
-            showToast("Item frozen to deep storage");
-        } else {
-            // Revert
-            state.allNodes = oldNodes;
-            render();
-            showToast("Freeze failed");
-        }
+        showToast("Freeze failed: " + insErr.message);
     }
+}
 
     // --- Clipboard ---
     function copy() { 
