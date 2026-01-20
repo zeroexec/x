@@ -1,280 +1,265 @@
 <!DOCTYPE html>
-<html lang="id">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>TASK</title>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
-    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
+    <title>Task Focus Hub</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         :root {
-            --accent-color: #3b82f6;
-            --accent-hover: #2563eb;
-            --main-bg: #0f172a;
-            --sidebar-bg: #1e293b;
-            --paper-bg: #1e293b;
-            --text-color: #f1f5f9;
-            --secondary-text: #94a3b8;
-            --border-color: #334155;
-            --delete-color: #ef4444;
-            --modal-bg: #1e293b;
+            --bg: #0b0b0b; --side: #141414; --accent: #0078d4;
+            --brd: #222; --txt: #aaa; --bright: #eee; --danger: #d83b01; --sel: rgba(0, 120, 212, 0.2);
+            --ctx-bg: #1c1c1c;
         }
-        * { box-sizing: border-box; }
-        body {
-            font-family: 'Inter', sans-serif;
-            background-color: var(--main-bg);
-            margin: 0;
-            padding: 0;
-            color: var(--text-color);
-            min-height: 100vh;
-            display: flex;
-            flex-direction: column;
+        body { margin: 0; font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--txt); height: 100vh; overflow: hidden; display: flex; flex-direction: column; }
+        
+        .main-content { display: flex; justify-content: center; padding: 20px; flex: 1; height: 100%; box-sizing: border-box; overflow: hidden; }
+
+        .panel { background: var(--side); border: 1px solid var(--brd); border-radius: 16px; display: flex; flex-direction: column; overflow: hidden; position: relative; width: 100%; max-width: 800px; }
+        .panel-h { padding: 15px 20px; border-bottom: 1px solid var(--brd); display: flex; justify-content: space-between; align-items: center; background: rgba(255,255,255,0.02); }
+        
+        /* Style untuk Header Link */
+        .panel-h h2 { margin: 0; font-size: 16px; color: var(--bright); display: flex; align-items: center; gap: 10px; text-transform: uppercase; font-weight: 700; cursor: pointer; transition: 0.2s; }
+        .panel-h h2:hover { color: var(--accent); }
+        .panel-h h2 a { text-decoration: none; color: inherit; display: flex; align-items: center; gap: 10px; }
+
+        .list-area { flex: 1; overflow-y: auto; padding: 15px; display: flex; flex-direction: column; gap: 8px; outline: none; }
+
+        .item-task { background: #1c1c1c; border: 1px solid var(--brd); padding: 15px 18px; border-radius: 12px; display: flex; align-items: flex-start; gap: 15px; transition: 0.2s; animation: slideIn 0.3s ease; }
+        @keyframes slideIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+        .check-btn { width: 24px; height: 24px; border-radius: 50%; border: 2px solid var(--accent); cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0; transition: 0.2s; }
+        .check-btn:hover { background: rgba(0, 120, 212, 0.2); }
+        .check-btn i { font-size: 12px; color: #fff; opacity: 0; transition: 0.2s; }
+        .check-btn:hover i { opacity: 1; }
+
+        .task-content { flex: 1; font-size: 15px; color: #fff; line-height: 1.4; white-space: pre-wrap; cursor: pointer; }
+
+        .btn-add { width: 38px; height: 38px; border-radius: 10px; border: none; background: #2a2a2a; color: #fff; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: 0.2s; }
+        .btn-add:hover { background: var(--accent); transform: scale(1.05); }
+
+        /* Modal Styles */
+        .modal-bg { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); display: none; align-items: flex-end; justify-content: center; z-index: 1000; opacity: 0; transition: opacity 0.3s ease; }
+        .modal-bg.active { opacity: 1; display: flex; }
+        .modal { background: #1c1c1c; width: 100%; max-width: 600px; border-radius: 24px 24px 0 0; transform: translateY(100%); transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1); padding: 25px; }
+        .modal-bg.active .modal { transform: translateY(0); }
+        .modal-input { width: 100%; background: transparent; border: none; color: #fff; outline: none; font-size: 18px; margin-bottom: 20px; line-height: 1.5; resize: none; min-height: 100px; }
+
+        /* Toast / Status Modal */
+        .status-modal-bg { position: fixed; bottom: 30px; left: 0; width: 100%; display: flex; justify-content: center; padding: 20px; z-index: 3000; pointer-events: none; }
+        .status-modal { 
+            background: #252525; color: #fff; padding: 12px 20px; border-radius: 12px; border: 1px solid var(--brd);
+            display: flex; align-items: center; gap: 15px; font-size: 14px; pointer-events: auto;
+            transform: translateY(200%); transition: transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
         }
-        .header {
-            background-color: rgba(15, 23, 42, 0.8);
-            backdrop-filter: blur(12px);
-            border-bottom: 1px solid var(--border-color); 
-            padding: 15px 40px;
-            display: flex; 
-            align-items: center; 
-            position: sticky; top: 0; z-index: 900; 
-        }
-        .header h1 { 
-            margin: 0; font-weight: 800; flex-grow: 1; 
-            font-size: 1.5rem;
-            color: var(--accent-color);
-            letter-spacing: 2px;
-        }
-        #addTaskButton {
-            width: 42px; height: 42px; border-radius: 12px;
-            background-color: var(--accent-color); color: #ffffff;
-            border: none; cursor: pointer; display: flex; align-items: center; justify-content: center;
-            transition: all 0.2s; box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
-            font-size: 1.2rem;
-        }
-        #addTaskButton:hover { transform: scale(1.05); background-color: var(--accent-hover); }
-        .content { 
-            padding: 30px 40px; 
-            flex-grow: 1; 
-            max-width: 1400px;
-            margin: 0 auto;
-            width: 100%;
-        }
-        #tasksGrid {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-            gap: 20px;
-            padding-bottom: 50px;
-        }
-        .task-card {
-            padding: 24px; border-radius: 16px; background-color: var(--paper-bg);
-            border: 1px solid var(--border-color); position: relative; cursor: pointer;
-            transition: all 0.2s; display: flex; flex-direction: column; min-height: 120px;
-            justify-content: space-between;
-        }
-        .task-card:hover { border-color: var(--accent-color); transform: translateY(-2px); }
-        .task-card-title {
-            margin: 0 0 12px 0; font-size: 1.1rem; font-weight: 600; color: var(--text-color);
-            line-height: 1.5; word-wrap: break-word; padding-right: 25px;
-        }
-        .task-card-title a { color: var(--accent-color); text-decoration: none; }
-        .task-card-title a:hover { text-decoration: underline; }
-        .task-timestamp {
-            font-size: 0.75rem; color: var(--secondary-text);
-            padding-top: 12px; border-top: 1px solid var(--border-color);
-            display: block;
-        }
-        .delete-btn {
-            position: absolute; top: 12px; right: 12px; background: none; border: none;
-            color: var(--secondary-text); cursor: pointer; opacity: 0; transition: all 0.2s;
-            padding: 5px;
-        }
-        .task-card:hover .delete-btn { opacity: 0.5; }
-        .delete-btn:hover { opacity: 1 !important; color: var(--delete-color); }
-        .modal-overlay {
-            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            background-color: rgba(0, 0, 0, 0.6); backdrop-filter: blur(4px);
-            display: none; justify-content: center; align-items: center; z-index: 2000;
-        }
-        .modal-content {
-            background-color: var(--modal-bg); border-radius: 20px;
-            width: 90%; max-width: 600px; padding: 40px; position: relative;
-            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5);
-            display: flex; flex-direction: column;
-        }
-        .modal-overlay.active { display: flex; }
-        #newTitle, #editTitle {
-            font-family: inherit; font-weight: 600; font-size: 1.3rem; border: none; outline: none;
-            width: 100%; background: none; color: var(--text-color); margin-bottom: 20px;
-            resize: none; border-bottom: 1px solid var(--border-color); padding-bottom: 10px;
-        }
-        .modal-actions { display: flex; justify-content: flex-end; gap: 12px; margin-top: 10px; }
-        .modal-btn {
-            padding: 12px 24px; border: none; border-radius: 10px;
-            font-weight: 600; cursor: pointer; font-family: inherit;
-        }
-        .modal-btn.action-cancel { background-color: var(--border-color); color: var(--text-color); }
-        .modal-btn.action-safe { background-color: var(--accent-color); color: #ffffff; }
-        @media (max-width: 768px) {
-            .header { padding: 10px 20px; }
-            .content { padding: 20px; }
-        }
+        .status-modal.active { transform: translateY(0); }
+        .undo-btn { background: var(--accent); color: white; border: none; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-weight: 600; font-size: 12px; }
+
+        .custom-context-menu { position: fixed; z-index: 2000; background: var(--ctx-bg); border: 1px solid var(--brd); border-radius: 10px; padding: 5px; min-width: 150px; display: none; box-shadow: 0 10px 25px rgba(0,0,0,0.5); }
+        .ctx-item { display: flex; align-items: center; gap: 12px; padding: 10px 15px; border-radius: 6px; cursor: pointer; color: #eee; font-size: 13px; }
+        .ctx-item:hover { background: var(--accent); }
+
+        .btn { flex: 1; padding: 14px; border-radius: 12px; border: none; font-weight: 600; cursor: pointer; font-size: 14px; }
+        .btn-p { background: var(--accent); color: #fff; }
+        .btn-s { background: #2a2a2a; color: #fff; }
+        .modal-footer { display: flex; gap: 10px; }
     </style>
 </head>
-<body>
-    <header class="header">
-        <h1>TASK</h1> 
-        <button id="addTaskButton" title="Tambah Task Baru" onclick="openAddTaskModal()">
-             <i class="fa-regular fa-file"></i>
-        </button>
-    </header>
-    <div class="modal-overlay" id="addTaskModalOverlay">
-        <div class="modal-content">
-            <textarea id="newTitle" placeholder="Tulis tugas baru..." rows="3"></textarea>
-            <div class="modal-actions">
-                <button class="modal-btn action-cancel" id="cancelNewTaskBtn">Batal</button> 
-                <button class="modal-btn action-safe" id="saveNewTaskBtn">Simpan</button>
-            </div>
+<body onkeydown="handleGlobalKeys(event)" onclick="hideContextMenu()">
+
+<div class="main-content">
+    <div class="panel">
+        <div class="panel-h">
+            <h2 id="title-link">
+                <a href="note.html">
+                    <i class="fas fa-check-double"></i> My Tasks
+                </a>
+            </h2>
+            <button class="btn-add" onclick="openEditor('task', 'item')"><i class="fas fa-plus"></i></button>
+        </div>
+        <div id="task-list" class="list-area" oncontextmenu="showEmptyContextMenu(event)"></div>
+    </div>
+</div>
+
+<div id="modal-container" class="modal-bg" onclick="if(event.target === this) closeModal()">
+    <div id="modal-content" class="modal">
+        <textarea id="m-content" class="modal-input" placeholder="Apa yang ingin dikerjakan?"></textarea>
+        <div class="modal-footer">
+            <button class="btn btn-s" onclick="closeModal()">Batal</button>
+            <button class="btn btn-p" id="confirm-btn" onclick="saveData()">Simpan (Enter)</button>
         </div>
     </div>
-    <div class="modal-overlay" id="editModalOverlay">
-        <div class="modal-content">
-            <input type="hidden" id="editTaskId">
-            <textarea id="editTitle" placeholder="Edit judul tugas..." rows="3"></textarea>
-            <div class="modal-actions">
-                <button class="modal-btn action-cancel" id="cancelEditBtn">Batal</button>
-                <button class="modal-btn action-safe" id="doneEditBtn">Simpan</button>
-            </div>
-        </div>
+</div>
+
+<div class="status-modal-bg">
+    <div id="status-modal" class="status-modal">
+        <i id="status-icon" class="fas fa-check-circle" style="color: #4caf50;"></i>
+        <span id="status-text">Task dihapus</span>
+        <button id="undo-btn" class="undo-btn" onclick="undoDelete()">BATALKAN</button>
     </div>
-    <div class="modal-overlay" id="confirmationModal">
-        <div class="modal-content" style="max-width: 400px; text-align: center;">
-            <p id="confirmationMessage" style="font-size: 1.1rem; margin-bottom: 25px;"></p>
-            <div style="display: flex; justify-content: center; gap: 10px;">
-                <button class="modal-btn action-cancel" id="confirmCancel">Batal</button>
-                <button class="modal-btn action-safe" id="confirmOK" style="background-color: var(--delete-color);">Hapus</button>
-            </div>
-        </div>
-    </div>
-    <main class="content">
-        <div id="tasksGrid"></div>
-    </main>
-    <script>
-        const firebaseConfig = {
-            apiKey: "AIzaSyCba6M_spBXvuG91Zn-XWJ4bSTX6vNcST0",
-            authDomain: "index-68220.firebaseapp.com",
-            databaseURL: "https://index-68220-default-rtdb.firebaseio.com",
-            projectId: "index-68220",
-            storageBucket: "index-68220.firebasestorage.app",
-            messagingSenderId: "633087068802",
-            appId: "1:633087068802:web:f8aa1f2ef9c00b99d1429b",
-            measurementId: "G-2VQCRFJQCM"
-        };
-        firebase.initializeApp(firebaseConfig);
-        const database = firebase.database();
-        const TASKS_REF = database.ref('tasks_only');
-        const addTaskModalOverlay = document.getElementById('addTaskModalOverlay');
-        const editModalOverlay = document.getElementById('editModalOverlay');
-        const confirmationModal = document.getElementById('confirmationModal');
-        const tasksGrid = document.getElementById('tasksGrid');
-        const newTitleInput = document.getElementById('newTitle');
-        const editTitleInput = document.getElementById('editTitle');
-        const editTaskId = document.getElementById('editTaskId');
-        let allTasks = {};
-        function autoLink(text) {
-            const urlRegex = /(\b(https?:\/\/\S+)|(www\.\S+))/g;
-            return text.replace(urlRegex, function(url) {
-                let fullUrl = url.match(/^https?:\/\//i) ? url : 'http://' + url;
-                return `<a href="${fullUrl}" target="_blank" onclick="event.stopPropagation();">${url}</a>`;
-            });
-        }
-        function formatTimestamp(isoString) {
-            if (!isoString) return '';
-            const date = new Date(isoString);
-            return isNaN(date.getTime()) ? '' : date.toLocaleDateString('id-ID', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
-        }
-        window.openAddTaskModal = () => {
-            newTitleInput.value = '';
-            addTaskModalOverlay.classList.add('active');
-            setTimeout(() => newTitleInput.focus(), 100);
-        };
-        function saveNewTask() {
-            const title = newTitleInput.value.trim();
-            if (title) {
-                TASKS_REF.push({ title, timestamp: new Date().toISOString() });
-                addTaskModalOverlay.classList.remove('active');
-            }
-        }
-        document.getElementById('saveNewTaskBtn').onclick = saveNewTask;
-        document.getElementById('cancelNewTaskBtn').onclick = () => addTaskModalOverlay.classList.remove('active');
-        window.openEditModal = (taskId) => {
-            const data = allTasks[taskId];
-            editTaskId.value = taskId;
-            editTitleInput.value = data.title;
-            editModalOverlay.classList.add('active');
-            setTimeout(() => editTitleInput.focus(), 100);
-        };
-        function saveEditTask() {
-            const id = editTaskId.value;
-            const title = editTitleInput.value.trim();
-            if (id && title) {
-                TASKS_REF.child(id).update({ title, timestamp: new Date().toISOString() });
-                editModalOverlay.classList.remove('active');
-            }
-        }
-        document.getElementById('doneEditBtn').onclick = saveEditTask;
-        document.getElementById('cancelEditBtn').onclick = () => editModalOverlay.classList.remove('active');
-        window.deleteTask = (id) => {
-            document.getElementById('confirmationMessage').textContent = "Hapus task ini secara permanen?";
-            confirmationModal.classList.add('active');
-            document.getElementById('confirmOK').onclick = () => { TASKS_REF.child(id).remove(); confirmationModal.classList.remove('active'); };
-            document.getElementById('confirmCancel').onclick = () => confirmationModal.classList.remove('active');
-        };
-        function renderTasks() {
-            tasksGrid.innerHTML = '';
-            const keys = Object.keys(allTasks).sort((a, b) => (allTasks[b].timestamp || '').localeCompare(allTasks[a].timestamp || ''));
-            if (keys.length === 0) {
-                tasksGrid.innerHTML = `<p style="color: var(--secondary-text); text-align: center; grid-column: 1/-1; padding: 40px;">Belum ada task yang tersedia.</p>`;
-                return;
-            }
-            keys.forEach(id => {
-                const data = allTasks[id];
-                const card = document.createElement('div');
-                card.className = 'task-card';
-                card.onclick = () => openEditModal(id);
-                card.innerHTML = `
-                    <button class="delete-btn" onclick="event.stopPropagation(); deleteTask('${id}')"><i class="fa-solid fa-trash-can"></i></button>
-                    <h3 class="task-card-title">${autoLink(data.title)}</h3>
-                    <span class="task-timestamp">Terakhir diubah: ${formatTimestamp(data.timestamp)}</span>
-                `;
-                tasksGrid.appendChild(card);
-            });
-        }
-        TASKS_REF.on('value', (snap) => { allTasks = snap.val() || {}; renderTasks(); });
-        document.addEventListener('keydown', (e) => {
-            if ((e.ctrlKey || e.metaKey) && e.key === 's') {
-                e.preventDefault();
-                if (editModalOverlay.classList.contains('active')) saveEditTask();
-                if (addTaskModalOverlay.classList.contains('active')) saveNewTask();
-            }
-            if (e.key === 'Escape') {
-                editModalOverlay.classList.remove('active');
-                addTaskModalOverlay.classList.remove('active');
-                confirmationModal.classList.remove('active');
-            }
+</div>
+
+<div id="ctx-menu" class="custom-context-menu"></div>
+
+<script>
+    const SUPABASE_URL = 'https://nynowiamkpddohtaoqvt.supabase.co';
+    const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im55bm93aWFta3BkZG9odGFvcXZ0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjY2MzQyODEsImV4cCI6MjA4MjIxMDI4MX0.vN7m2SUztxtHUROEMOqtbqMGRPehM9UJZP_VSsVMRtw';
+    const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+    const TBL = 'personal_hub';
+
+    let rawData = [];
+    let lastDeletedItem = null;
+    let state = { activeItem: null, modalAction: null };
+    let toastTimer;
+
+    async function syncAndRender() {
+        const { data, error } = await sb.from(TBL).select('*').eq('category', 'task').order('created_at', {ascending: false});
+        if (!error) { rawData = data; render(); }
+    }
+
+    function render() {
+        const taskList = document.getElementById('task-list');
+        taskList.innerHTML = '';
+        rawData.forEach(item => {
+            const div = document.createElement('div');
+            div.className = 'item-task';
+            div.innerHTML = `
+                <div class="check-btn" onclick="deleteTask('${item.id}')" title="Selesaikan & Hapus">
+                    <i class="fas fa-check"></i>
+                </div>
+                <div class="task-content" onclick="editTask('${item.id}')">${item.content}</div>
+            `;
+            div.oncontextmenu = (e) => { e.stopPropagation(); showContextMenu(e, item); };
+            taskList.appendChild(div);
         });
-    </script>
-    <script>
-    function sendActionToParent(actionType) { if (window.parent !== window) window.parent.postMessage({ type: actionType }, '*'); }
-    document.addEventListener('keydown', function(e) {
-        if ((e.ctrlKey || e.metaKey)) {
-            if (e.key === 'o') { e.preventDefault(); sendActionToParent('OPEN_SEARCH_MODAL'); }
-            if (e.key === 'l') { e.preventDefault(); sendActionToParent('OPEN_LOGIN_MODAL'); }
-            if (e.key === 'u') { e.preventDefault(); sendActionToParent('OPEN_CHANGE_CREDS_MODAL'); }
+    }
+
+    async function deleteTask(id) {
+        const item = rawData.find(i => i.id === id);
+        if (!item) return;
+        
+        lastDeletedItem = { ...item };
+        
+        // Optimistic Delete (UI dulu baru Database)
+        rawData = rawData.filter(i => i.id !== id);
+        render();
+
+        const { error } = await sb.from(TBL).delete().eq('id', id);
+        
+        if (!error) {
+            showToast("Task berhasil dihapus", true);
         }
-    });
-    </script>
+    }
+
+    async function undoDelete() {
+        if (!lastDeletedItem) return;
+        
+        const { id, created_at, ...payload } = lastDeletedItem;
+        await sb.from(TBL).insert([payload]);
+        
+        lastDeletedItem = null;
+        hideToast();
+        await syncAndRender();
+    }
+
+    function showToast(text, showUndo = false) {
+        clearTimeout(toastTimer);
+        const modal = document.getElementById('status-modal');
+        const label = document.getElementById('status-text');
+        const undoBtn = document.getElementById('undo-btn');
+        
+        label.innerText = text;
+        undoBtn.style.display = showUndo ? 'block' : 'none';
+        modal.classList.add('active');
+        
+        toastTimer = setTimeout(hideToast, 4000);
+    }
+
+    function hideToast() {
+        document.getElementById('status-modal').classList.remove('active');
+    }
+
+    function openEditor(cat, type, item = null) {
+        state.activeItem = item;
+        state.modalAction = 'save';
+        document.getElementById('m-content').value = item ? item.content : '';
+        
+        const bg = document.getElementById('modal-container');
+        bg.style.display = 'flex';
+        setTimeout(() => {
+            bg.classList.add('active');
+            document.getElementById('m-content').focus();
+        }, 10);
+    }
+
+    function closeModal() {
+        const bg = document.getElementById('modal-container');
+        bg.classList.remove('active');
+        setTimeout(() => bg.style.display = 'none', 300);
+    }
+
+    async function saveData() {
+        const content = document.getElementById('m-content').value.trim();
+        if(!content) return;
+
+        const payload = { 
+            title: content.substring(0, 50), 
+            content, 
+            category: 'task', 
+            type: 'item', 
+            store: 'main' 
+        };
+
+        if(state.activeItem) {
+            await sb.from(TBL).update({ title: payload.title, content }).eq('id', state.activeItem.id);
+        } else {
+            await sb.from(TBL).insert([payload]);
+        }
+        
+        closeModal();
+        await syncAndRender();
+        showToast("Tersimpan");
+    }
+
+    function editTask(id) {
+        openEditor('task', 'item', rawData.find(i => i.id === id));
+    }
+
+    function showContextMenu(e, item) {
+        e.preventDefault();
+        const menu = document.getElementById('ctx-menu');
+        menu.innerHTML = `
+            <div class="ctx-item" onclick="editTask('${item.id}')"><i class="fas fa-edit"></i> Edit</div>
+            <div class="ctx-item" onclick="deleteTask('${item.id}')" style="color:var(--danger)"><i class="fas fa-trash"></i> Hapus</div>
+        `;
+        displayMenu(e, menu);
+    }
+
+    function showEmptyContextMenu(e) {
+        e.preventDefault();
+        const menu = document.getElementById('ctx-menu');
+        menu.innerHTML = `<div class="ctx-item" onclick="openEditor('task', 'item')"><i class="fas fa-plus"></i> Tambah Task</div>`;
+        displayMenu(e, menu);
+    }
+
+    function displayMenu(e, menu) {
+        menu.style.display = 'block';
+        menu.style.left = e.clientX + 'px';
+        menu.style.top = e.clientY + 'px';
+    }
+
+    function hideContextMenu() { document.getElementById('ctx-menu').style.display = 'none'; }
+
+    function handleGlobalKeys(e) {
+        if (document.querySelector('.modal-bg.active')) {
+            if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); saveData(); }
+            if (e.key === 'Escape') closeModal();
+        }
+    }
+
+    syncAndRender();
+</script>
 </body>
 </html>
